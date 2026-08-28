@@ -7,9 +7,11 @@ This repository is **not** the source of truth for courses, learner state, sessi
 ## Runtime model
 
 - `site/` is a generated/static deployment mirror of the existing Learning Studio UI.
-- The Pages workflow fetches only the sanitized `pages-snapshot` payload from the existing GAS deployment.
-- `scripts/validate-snapshot.mjs` blocks unexpected or sensitive-looking fields before Pages deployment.
+- `site/data/snapshot.json` is a sanitized deployment snapshot, not canonical learner state.
+- `scripts/validate-snapshot.mjs` enforces a nested field allowlist and rejects credential-, contact-, URL-, and private-data shaped values before Pages deployment.
 - Detailed learner evidence, raw `STATE.md`, corrections, answers, credentials, and private data are not part of the public payload.
-- Public data refreshes hourly and on manual workflow dispatch.
+- The current snapshot is regenerated from the canonical sources when the public deployment is updated.
+
+The existing GAS Learning Studio remains private. Its deployment is not made public just to feed GitHub Pages.
 
 If the canonical Learning Studio UI changes, regenerate the static mirror from `teach-workspace`; do not redesign the public copy independently.
