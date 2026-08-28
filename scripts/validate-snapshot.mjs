@@ -42,52 +42,71 @@ function scanValues(value, path = '$') {
 
 function validateProgress(progress, courseId) {
   if (progress === null) return;
-  assertObject(progress, `learning.courses.${courseId}.progress`);
   const path = `learning.courses.${courseId}.progress`;
-  const type = String(progress.type || '');
+  assertObject(progress, path);
+  const model = String(progress.model || '');
 
-  if (type === 'construction') {
-    allowOnly(progress, ['type', 'trackName', 'completed', 'total', 'currentNumber', 'currentLabel', 'objectives', 'exams'], path);
-    for (const [index, item] of (progress.objectives || []).entries()) allowOnly(item, ['done', 'text'], `${path}.objectives[${index}]`);
-    for (const [index, item] of (progress.exams || []).entries()) allowOnly(item, ['label', 'status', 'detail'], `${path}.exams[${index}]`);
+  if (model === 'linear-cycle') {
+    allowOnly(progress, ['model', 'label', 'current', 'steps', 'secondary'], path);
+    if (progress.current !== null) allowOnly(progress.current, ['position', 'total', 'label'], `${path}.current`);
+    for (const [index, item] of (progress.steps || []).entries()) {
+      allowOnly(item, ['id', 'label', 'status'], `${path}.steps[${index}]`);
+      assert(['done', 'current', 'todo'].includes(item.status), `Invalid step status at ${path}.steps[${index}]`);
+    }
+    if (progress.secondary !== null) {
+      allowOnly(progress.secondary, ['label', 'currentLabel', 'items'], `${path}.secondary`);
+      for (const [index, item] of (progress.secondary.items || []).entries()) {
+        allowOnly(item, ['id', 'label', 'status', 'detail'], `${path}.secondary.items[${index}]`);
+        assert(['done', 'current', 'todo'].includes(item.status), `Invalid secondary status at ${path}.secondary.items[${index}]`);
+      }
+    }
     return;
   }
-  if (type === 'korean') {
-    allowOnly(progress, ['type', 'currentUnit', 'units'], path);
-    for (const [index, item] of (progress.units || []).entries()) allowOnly(item, ['done', 'number', 'label'], `${path}.units[${index}]`);
+
+  if (model === 'dynamic-gaps') {
+    allowOnly(progress, ['model', 'currentFocus', 'persistentPatterns'], path);
     return;
   }
-  if (type === 'english') {
-    allowOnly(progress, ['type', 'currentObjective', 'objectives', 'repair'], path);
-    for (const [index, item] of (progress.objectives || []).entries()) allowOnly(item, ['done', 'text'], `${path}.objectives[${index}]`);
-    for (const [index, item] of (progress.repair || []).entries()) allowOnly(item, ['done', 'text'], `${path}.repair[${index}]`);
+
+  if (model === 'expanding-map') {
+    allowOnly(progress, ['model', 'items'], path);
+    for (const [index, item] of (progress.items || []).entries()) {
+      allowOnly(item, ['id', 'concept', 'type', 'action', 'status'], `${path}.items[${index}]`);
+      assert(['NEW', 'PRACTICING'].includes(item.status), `Invalid gap status at ${path}.items[${index}]`);
+    }
     return;
   }
-  if (type === 'japanese') {
-    allowOnly(progress, ['type', 'next', 'checkpoints'], path);
-    for (const [index, item] of (progress.checkpoints || []).entries()) allowOnly(item, ['date', 'title'], `${path}.checkpoints[${index}]`);
-    return;
-  }
-  allowOnly(progress, ['type'], path);
+
+  allowOnly(progress, ['model'], path);
+}
+
+function validateSession(item, path) {
+  allowOnly(item, ['date', 'title', 'track', 'learningScope', 'reviewNeeded', 'sessionId', 'source'], path);
+  assert(item.source === 'SESSION_LOG', `Unexpected session source at ${path}`);
 }
 
 allowOnly(snapshot, ['schemaVersion', 'generatedAt', 'learning', 'monthly'], '$');
-assert(snapshot.schemaVersion === 1, 'Unexpected snapshot schemaVersion');
-
+assert(snapshot.schemaVersion === 2, 'Unexpected snapshot schemaVersion');
 allowOnly(snapshot.learning, ['courses', 'courseOrder', 'weekDays', 'updatedAt'], 'learning');
+
 const courses = snapshot.learning.courses || {};
 assertObject(courses, 'learning.courses');
 for (const [id, course] of Object.entries(courses)) {
   const path = `learning.courses.${id}`;
-  allowOnly(course, ['id', 'key', 'name', 'short', 'kind', 'quotaId', 'resume', 'next', 'priority', 'progress', 'evidence', 'sessions'], path);
+  allowOnly(course, ['id', 'key', 'name', 'short', 'kind', 'progressModel', 'resume', 'next', 'priority', 'progress', 'evidence', 'sessions', 'historySessions', 'reviewQueue'], path);
+  assert(['linear-cycle', 'dynamic-gaps', 'expanding-map'].includes(course.progressModel), `Invalid progressModel for ${id}`);
   validateProgress(course.progress, id);
+  assert(course.progress?.model === course.progressModel, `Progress model mismatch for ${id}`);
   for (const [index, item] of (course.evidence || []).entries()) {
     allowOnly(item, ['status', 'text'], `${path}.evidence[${index}]`);
     assert(['ok', 'warn'].includes(item.status), `Invalid evidence status for ${id}`);
     assert(/^\d+ 項(?:穩定學習證據|持續觀察)$|^目前無需/.test(item.text), `Detailed evidence leaked for ${id}`);
   }
-  for (const [index, item] of (course.sessions || []).entries()) allowOnly(item, ['date', 'title', 'sessionId', 'source'], `${path}.sessions[${index}]`);
+  for (const [index, item] of (course.sessions || []).entries()) validateSession(item, `${path}.sessions[${index}]`);
+  for (const [index, item] of (course.historySessions || []).entries()) validateSession(item, `${path}.historySessions[${index}]`);
+  for (const [index, item] of (course.reviewQueue || []).entries()) allowOnly(item, ['text', 'date', 'sessionId'], `${path}.reviewQueue[${index}]`);
 }
+
 for (const [index, day] of (snapshot.learning.weekDays || []).entries()) {
   const path = `learning.weekDays[${index}]`;
   allowOnly(day, ['date', 'sessions'], path);
