@@ -6,6 +6,7 @@ on:
     paths:
       - 'site/**'
       - 'scripts/validate-snapshot.mjs'
+      - 'scripts/validate-architecture.mjs'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
 
@@ -36,6 +37,9 @@ jobs:
 
       - name: Validate public snapshot
         run: node scripts/validate-snapshot.mjs site/data/snapshot.json
+
+      - name: Validate Pages architecture
+        run: node scripts/validate-architecture.mjs site/assets
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
