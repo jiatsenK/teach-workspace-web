@@ -1,0 +1,64 @@
+name: Deploy Learning Studio
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'scripts/validate-snapshot.mjs'
+      - '.github/workflows/deploy-pages.yml'
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy-learning-studio
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Fetch sanitized Learning Studio snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p site/data
+          curl --fail --silent --show-error --location --retry 3 \
+            --data '' \
+            'https://script.google.com/macros/s/AKfycbxefSrx96-xt03xzwi_pZIjeOBwKSsspyeg7nK64TN9MZRQMJfYGLi12h-pCdP1P1SDTw/exec?action=pages-snapshot' \
+            --output site/data/snapshot.json
+
+      - name: Validate public snapshot
+        run: node scripts/validate-snapshot.mjs site/data/snapshot.json
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

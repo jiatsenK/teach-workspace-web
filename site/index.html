@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Learning Studio</title>
+<link rel="stylesheet" href="./assets/styles.css">
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <div class="brand">Planning Workbench</div>
+    <div class="product-switch"><button type="button" class="active">Learning</button></div>
+    <div class="top-spacer"></div>
+    <button class="ghost" id="refreshBtn" type="button">Data snapshot</button>
+  </header>
+  <nav class="viewbar" id="viewBar"></nav>
+  <main class="canvas" id="app"><div class="loading">正在讀取 learning snapshot…</div></main>
+</div>
+<div class="backdrop" id="backdrop"></div>
+<aside class="sheet" id="sheet"></aside>
+<div class="toast" id="toast"></div>
+<script src="./assets/runtime.js"></script>
+<script src="./assets/app.js"></script>
+</body>
+</html>
