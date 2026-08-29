@@ -6,7 +6,7 @@ function scriptCall(method) {
   });
 }
 
-export function createStudioApp(routes) {
+export function createStudioApp(routes, options = {}) {
   const params = new URLSearchParams(location.search);
   const state = {
     view: routes[params.get('view')] ? params.get('view') : 'home',
@@ -35,15 +35,22 @@ export function createStudioApp(routes) {
   function syncUrl() {
     const url = new URL(location.href);
     url.searchParams.set('view', state.view);
-    if (state.subjectId) url.searchParams.set('subject', state.subjectId); else url.searchParams.delete('subject');
-    if (state.courseId) url.searchParams.set('course', state.courseId); else url.searchParams.delete('course');
-    if (state.view === 'unit' && state.unitId) url.searchParams.set('unit', state.unitId); else url.searchParams.delete('unit');
+    if (state.subjectId) url.searchParams.set('subject', state.subjectId);
+    else url.searchParams.delete('subject');
+    if (state.courseId) url.searchParams.set('course', state.courseId);
+    else url.searchParams.delete('course');
+    if (state.view === 'unit' && state.unitId) url.searchParams.set('unit', state.unitId);
+    else url.searchParams.delete('unit');
     history.replaceState({}, '', url);
   }
 
   function bind(render) {
-    document.querySelectorAll('[data-view]').forEach((button) => { button.onclick = () => { state.view = button.dataset.view; state.unitId = ''; render(); }; });
-    document.querySelectorAll('[data-course]').forEach((button) => { button.onclick = () => { state.courseId = button.dataset.course; state.unitId = ''; render(); }; });
+    document.querySelectorAll('[data-view]').forEach((button) => {
+      button.onclick = () => { state.view = button.dataset.view; state.unitId = ''; render(); };
+    });
+    document.querySelectorAll('[data-course]').forEach((button) => {
+      button.onclick = () => { state.courseId = button.dataset.course; state.unitId = ''; render(); };
+    });
     document.querySelectorAll('[data-open-subject]').forEach((button) => {
       button.onclick = () => {
         state.subjectId = button.dataset.openSubject;
@@ -74,8 +81,12 @@ export function createStudioApp(routes) {
         render();
       };
     });
-    document.querySelectorAll('[data-go-subject]').forEach((button) => { button.onclick = () => { state.unitId = ''; state.view = 'subject'; render(); }; });
-    document.querySelectorAll('[data-go-home]').forEach((button) => { button.onclick = () => { state.unitId = ''; state.view = 'home'; render(); }; });
+    document.querySelectorAll('[data-go-subject]').forEach((button) => {
+      button.onclick = () => { state.unitId = ''; state.view = 'subject'; render(); };
+    });
+    document.querySelectorAll('[data-go-home]').forEach((button) => {
+      button.onclick = () => { state.unitId = ''; state.view = 'home'; render(); };
+    });
   }
 
   function render() {
@@ -87,6 +98,7 @@ export function createStudioApp(routes) {
     syncUrl();
     document.getElementById('viewBar').innerHTML = viewBar(state.view);
     document.getElementById('app').innerHTML = routes[state.view]({
+      view: state.view,
       learning: state.learning,
       monthly: state.monthly,
       course,
@@ -96,12 +108,16 @@ export function createStudioApp(routes) {
       subjectId: state.subjectId,
     });
     bind(render);
+    options.afterRender?.({ state, render });
   }
 
   async function init() {
-    document.getElementById('app').innerHTML = '<div class="loading">正在讀取學習資料…</div>';
+    document.getElementById('app').innerHTML = '<div class="loading">正在讀取 learning snapshot…</div>';
     try {
-      [state.learning, state.monthly] = await Promise.all([scriptCall('getLearningWorkspaceData'), scriptCall('getMonthlyLearningStatus')]);
+      [state.learning, state.monthly] = await Promise.all([
+        scriptCall('getLearningWorkspaceData'),
+        scriptCall('getMonthlyLearningStatus'),
+      ]);
       const subjects = state.learning?.hierarchy?.subjects || [];
       if (!state.subjectId) state.subjectId = subjects[0]?.id || '';
       if (!state.courseId || (!state.learning?.courses?.[state.courseId] && !hierarchyCourse(state.courseId))) {

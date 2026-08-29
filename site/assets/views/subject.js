@@ -37,13 +37,21 @@ export function subjectView({ learning, subjectId }) {
   const hierarchy = learning?.hierarchy || {};
   const subject = (hierarchy.subjects || []).find((item) => item.id === subjectId) || hierarchy.subjects?.[0];
   if (!subject) return `${pageHeader('學習', '目前尚未建立學科。')}<div class="empty">沒有可顯示的學科。</div>`;
+
   const courses = courseMap(hierarchy);
   const active = (subject.currentCourseIds || []).map((id) => courses[id]).filter(Boolean);
   const history = (subject.historyCourseIds || []).map((id) => courses[id]).filter(Boolean);
+
   return `${pageHeader(subject.name, '選擇目前正在進行的課程，或回顧歷史課程。點單元數字可以直接查看內容。')}
     <div class="stack">
-      <section><h2 class="section-title">目前進行中</h2><div class="stack">${active.length ? active.map(courseCard).join('') : '<div class="empty">目前沒有進行中的課程。</div>'}</div></section>
-      <section><h2 class="section-title">歷史課程</h2><div class="stack">${history.length ? history.map(courseCard).join('') : '<div class="empty">目前沒有歷史課程。</div>'}</div></section>
+      <section>
+        <h2 class="section-title">目前進行中</h2>
+        <div class="stack">${active.length ? active.map(courseCard).join('') : '<div class="empty">目前沒有進行中的課程。</div>'}</div>
+      </section>
+      <section>
+        <h2 class="section-title">歷史課程</h2>
+        <div class="stack">${history.length ? history.map(courseCard).join('') : '<div class="empty">目前沒有歷史課程。</div>'}</div>
+      </section>
       <button class="btn secondary" data-go-home="1">回學習首頁</button>
     </div>`;
 }

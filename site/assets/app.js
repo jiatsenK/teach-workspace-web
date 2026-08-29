@@ -1,10 +1,20 @@
 import { createStudioApp } from './lib/studio-app.js';
-import { homeView } from './views/home.js';
-import { subjectView } from './views/subject.js';
-import { courseView } from './views/course.js';
-import { unitView } from './views/unit.js';
-import { progressView } from './views/progress.js';
-import { monthView } from './views/month.js';
+import { learningStudioView } from './learning-studio/view.js';
+import { bindLearningStudio } from './learning-studio/controller.js';
 
-const routes = { home: homeView, subject: subjectView, course: courseView, unit: unitView, progress: progressView, rhythm: monthView };
-createStudioApp(routes).init();
+const routes = Object.fromEntries(
+  ['home', 'subject', 'course', 'unit', 'progress', 'rhythm'].map((key) => [key, learningStudioView]),
+);
+
+document.documentElement.dataset.learningStudio = 'v1';
+for (const href of [
+  './assets/learning-studio/tokens.css',
+  './assets/learning-studio/styles.css',
+]) {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = href;
+  document.head.append(link);
+}
+
+createStudioApp(routes, { afterRender: bindLearningStudio }).init();

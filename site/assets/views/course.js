@@ -29,32 +29,51 @@ function unitCards(course) {
 function vocabularySummary(course) {
   const vocab = course?.vocabulary;
   if (!vocab || !Number(vocab.total || 0)) return '';
-  return `<div class="card"><h3 class="section-title">單字記憶</h3><div class="metric">${Number(vocab.total || 0)} <small>個單字</small></div><p class="subtle" style="margin:8px 0 0">已記住 ${Number(vocab.remembered || 0)} · 練習中 ${Number(vocab.practicing || 0)} · 待複習 ${Number(vocab.reviewing || 0)}</p></div>`;
+  return `<div class="card"><h3 class="section-title">單字記憶</h3>
+    <div class="metric">${Number(vocab.total || 0)} <small>個單字</small></div>
+    <p class="subtle" style="margin:8px 0 0">已記住 ${Number(vocab.remembered || 0)} · 練習中 ${Number(vocab.practicing || 0)} · 待複習 ${Number(vocab.reviewing || 0)}</p>
+  </div>`;
 }
 
 function recentLearning(course) {
   const sessions = course?.sessions || [];
-  return `<div class="card"><h3 class="section-title">最近學習</h3>${sessions.length ? sessions.slice(0, 3).map((session) => `<p style="margin:8px 0"><b>${esc(session.date)}</b><br><span class="subtle">${esc(session.title)}</span></p>`).join('') : '<div class="empty">目前沒有可顯示的學習紀錄。</div>'}</div>`;
+  return `<div class="card"><h3 class="section-title">最近學習</h3>${sessions.length
+    ? sessions.slice(0, 3).map((session) => `<p style="margin:8px 0"><b>${esc(session.date)}</b><br><span class="subtle">${esc(session.title)}</span></p>`).join('')
+    : '<div class="empty">目前沒有可顯示的學習紀錄。</div>'}</div>`;
 }
 
 function reviewSummary(course) {
   const queue = course?.reviewQueue || [];
-  return `<div class="card"><h3 class="section-title">待複習</h3>${queue.length ? `<ul>${queue.slice(0, 5).map((item) => `<li>${esc(item.text)}</li>`).join('')}</ul>` : '<div class="empty">目前沒有待複習項目。</div>'}</div>`;
+  return `<div class="card"><h3 class="section-title">待複習</h3>${queue.length
+    ? `<ul>${queue.slice(0, 5).map((item) => `<li>${esc(item.text)}</li>`).join('')}</ul>`
+    : '<div class="empty">目前沒有待複習項目。</div>'}</div>`;
 }
 
 export function courseView({ course, hierarchyCourse }) {
   const displayCourse = hierarchyCourse || course;
   if (!displayCourse) return `${pageHeader('課程', '找不到這門課程。')}<button class="btn secondary" data-go-subject="1">回學科課程列表</button>`;
+
   const units = displayCourse.units || [];
   const resume = course?.resume || (displayCourse.status === 'active' ? '依目前進度繼續' : '歷史課程');
   const next = course?.next || '';
   const description = displayCourse.kind || course?.kind || (displayCourse.status === 'active' ? '目前進行中的課程' : '歷史課程');
+
   return `${pageHeader(displayCourse.name, description)}
     <div class="course-shell">
       <section class="stack">
-        <div class="card purple resume"><span class="chip">${displayCourse.status === 'active' ? '目前進度' : '歷史課程'}</span><h2>${esc(resume)}</h2>${next ? `<p>${esc(next)}</p>` : ''}${unitProgress(displayCourse)}<button class="btn secondary" data-go-subject="1" style="margin-top:14px">回學科課程列表</button></div>
+        <div class="card purple resume">
+          <span class="chip">${displayCourse.status === 'active' ? '目前進度' : '歷史課程'}</span>
+          <h2>${esc(resume)}</h2>
+          ${next ? `<p>${esc(next)}</p>` : ''}
+          ${unitProgress(displayCourse)}
+          <button class="btn secondary" data-go-subject="1" style="margin-top:14px">回學科課程列表</button>
+        </div>
         ${units.length ? unitCards(displayCourse) : course?.progress ? `<div>${renderProjectProgress(course.progress)}</div>` : '<div class="card"><div class="empty">這門課目前沒有固定單元課綱。</div></div>'}
       </section>
-      <aside class="stack">${vocabularySummary(displayCourse)}${recentLearning(course)}${reviewSummary(course)}</aside>
+      <aside class="stack">
+        ${vocabularySummary(displayCourse)}
+        ${recentLearning(course)}
+        ${reviewSummary(course)}
+      </aside>
     </div>`;
 }
