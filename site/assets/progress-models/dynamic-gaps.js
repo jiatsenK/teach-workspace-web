@@ -7,7 +7,7 @@ function gapList(items, emptyText) {
 
 export function renderDynamicGaps(progress) {
   return `<div class="grid2">
-    <section class="card soft"><div class="eyebrow">CURRENT FOCUS</div><h3 class="section-title" style="margin-top:5px">目前鎖定弱點</h3>${gapList(progress?.currentFocus, '目前沒有 active retrieval candidates。')}</section>
-    <section class="card"><div class="eyebrow">PERSISTENT</div><h3 class="section-title" style="margin-top:5px">長期反覆模式</h3>${gapList(progress?.persistentPatterns, '目前沒有 persistent misconceptions。')}</section>
+    <section class="card soft"><div class="eyebrow">這次先練這些</div><h3 class="section-title" style="margin-top:5px">最近常犯的錯誤</h3>${gapList(progress?.currentFocus, '目前沒有需要特別練習的內容。')}</section>
+    <section class="card"><div class="eyebrow">反覆出現</div><h3 class="section-title" style="margin-top:5px">一直容易出錯的地方</h3>${gapList(progress?.persistentPatterns, '目前沒有反覆出現的錯誤。')}</section>
   </div>`;
 }
