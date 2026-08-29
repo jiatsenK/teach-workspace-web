@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 3,
+  "generatedAt": "2026-08-29T00:00:00+08:00",
+  "learning": {
+    "courses": {},
+    "courseOrder": [],
+    "hierarchy": {
+      "subjects": [
+        { "id": "korean", "name": "韓文", "order": 1, "currentCourseIds": ["korean-1"], "historyCourseIds": [] },
+        { "id": "japanese", "name": "日文", "order": 2, "currentCourseIds": ["japanese-output"], "historyCourseIds": [] },
+        { "id": "english", "name": "英文", "order": 3, "currentCourseIds": ["english-learning"], "historyCourseIds": [] },
+        { "id": "construction", "name": "營造工程", "order": 4, "currentCourseIds": ["construction-a"], "historyCourseIds": [] }
+      ],
+      "courses": [
+        {
+          "id": "korean-1", "subjectId": "korean", "name": "高麗大學韓國語 1", "short": "韓國語 1", "courseType": "formal", "status": "active", "progress": {},
+          "units": [
+            { "id": "ko-u1", "number": 1, "name": "基礎問候與介紹", "status": "done", "sourceRange": "Prototype 示意範圍", "outline": ["問候、自我介紹與基礎句型"], "content": [{ "id": "ko-c1", "type": "句型", "label": "自我介紹", "explanation": "Prototype 示意內容：這裡呈現本課重點與使用情境。", "sourceRange": "Prototype mock" }], "vocabulary": [{ "id": "ko-v1", "word": "안녕하세요", "meaning": "您好", "form": "", "memoryStatus": "練習中", "sourceRange": "Prototype mock" }] },
+            { "id": "ko-u2", "number": 2, "name": "日常物品", "status": "current", "sourceRange": "Prototype 示意範圍", "outline": ["指示物品與詢問名稱"], "content": [{ "id": "ko-c2", "type": "文法", "label": "這是什麼？", "explanation": "Prototype 示意內容：將課程說明放在展開後的原位置。", "sourceRange": "Prototype mock" }], "vocabulary": [] },
+            { "id": "ko-u3", "number": 3, "name": "地點與方位", "status": "todo", "sourceRange": "Prototype 示意範圍", "outline": ["表達地點與方位"], "content": [], "vocabulary": [] }
+          ],
+          "vocabulary": { "total": 1, "remembered": 0, "practicing": 1, "reviewing": 0 }
+        },
+        {
+          "id": "japanese-output", "subjectId": "japanese", "name": "進階日文輸出", "short": "進階輸出", "courseType": "formal", "status": "active", "progress": {},
+          "units": [
+            { "id": "ja-u1", "number": 1, "name": "表達整理", "status": "current", "sourceRange": "Prototype 示意範圍", "outline": ["整理相似表達的語感差異"], "content": [{ "id": "ja-c1", "type": "輸出練習", "label": "根據情境選擇表達", "explanation": "Prototype 示意內容：保留足夠文字，測試展開後的閱讀感。", "sourceRange": "Prototype mock" }], "vocabulary": [] },
+            { "id": "ja-u2", "number": 2, "name": "口語轉換", "status": "todo", "sourceRange": "Prototype 示意範圍", "outline": ["從書面語轉成自然口語"], "content": [], "vocabulary": [] }
+          ],
+          "vocabulary": { "total": 0, "remembered": 0, "practicing": 0, "reviewing": 0 }
+        },
+        {
+          "id": "english-learning", "subjectId": "english", "name": "英語學習", "short": "英語學習", "courseType": "formal", "status": "active", "progress": {},
+          "units": [
+            { "id": "en-u1", "number": 1, "name": "輸出缺口", "status": "current", "sourceRange": "Prototype 示意範圍", "outline": ["依目前 retrieval candidates 組織練習"], "content": [{ "id": "en-c1", "type": "練習", "label": "重建句子", "explanation": "Prototype 示意內容：展示非線性課程也能使用同一資料階層。", "sourceRange": "Prototype mock" }], "vocabulary": [] },
+            { "id": "en-u2", "number": 2, "name": "跨情境回想", "status": "todo", "sourceRange": "Prototype 示意範圍", "outline": ["將已學表達移到新情境"], "content": [], "vocabulary": [] }
+          ],
+          "vocabulary": { "total": 0, "remembered": 0, "practicing": 0, "reviewing": 0 }
+        },
+        {
+          "id": "construction-a", "subjectId": "construction", "name": "營造工程管理甲級", "short": "營造甲級", "courseType": "formal", "status": "active", "progress": {},
+          "units": [
+            { "id": "co-u1", "number": 1, "name": "工程管理概念", "status": "done", "sourceRange": "Prototype 示意範圍", "outline": ["建立管理主題與考點地圖"], "content": [{ "id": "co-c1", "type": "考點", "label": "管理基礎", "explanation": "Prototype 示意內容：比較長文與專業名詞在三種版型中的呈現。", "sourceRange": "Prototype mock" }], "vocabulary": [] },
+            { "id": "co-u2", "number": 2, "name": "品質與施工管理", "status": "current", "sourceRange": "Prototype 示意範圍", "outline": ["品質管制、檢驗與紀錄"], "content": [{ "id": "co-c2", "type": "重點", "label": "品質管制流程", "explanation": "Prototype 示意內容：内容只用來測試前端層級，不代表正式教材。", "sourceRange": "Prototype mock" }], "vocabulary": [] },
+            { "id": "co-u3", "number": 3, "name": "職業安全", "status": "todo", "sourceRange": "Prototype 示意範圍", "outline": ["風險辨識與預防原則"], "content": [], "vocabulary": [] }
+          ],
+          "vocabulary": { "total": 0, "remembered": 0, "practicing": 0, "reviewing": 0 }
+        }
+      ]
+    },
+    "weekDays": [],
+    "updatedAt": "2026-08-29T00:00:00+08:00"
+  },
+  "monthly": {}
+}
