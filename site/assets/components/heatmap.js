@@ -14,7 +14,7 @@ export function heatmap(monthly, projectKey) {
     const date = `${month.year}-${String(month.month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const count = Number(counts[date] || 0);
     const opacity = count <= 0 ? 0 : Math.min(0.22 + count * 0.22, 0.9);
-    cells.push(`<span title="${esc(date)}${count ? ` · ${count} Session${count > 1 ? 's' : ''}` : ''}" style="display:block;aspect-ratio:1;border-radius:3px;background:${count ? `rgba(110,90,166,${opacity})` : 'transparent'}"></span>`);
+    cells.push(`<span title="${esc(date)}${count ? ` · 學習 ${count} 次` : ''}" style="display:block;aspect-ratio:1;border-radius:3px;background:${count ? `rgba(110,90,166,${opacity})` : 'transparent'}"></span>`);
   }
   return `<div style="margin-bottom:18px"><div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(month.label)}學習節奏</div><div style="display:grid;grid-template-columns:repeat(${daysInMonth},minmax(6px,1fr));gap:3px;align-items:center">${cells.join('')}</div></div>`;
 }
