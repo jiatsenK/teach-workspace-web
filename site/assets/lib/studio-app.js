@@ -57,7 +57,7 @@ export function createStudioApp(routes) {
   }
 
   async function init() {
-    document.getElementById('app').innerHTML = '<div class="loading">正在讀取 learning snapshot…</div>';
+    document.getElementById('app').innerHTML = '<div class="loading">正在讀取學習資料…</div>';
     try {
       [state.learning, state.monthly] = await Promise.all([
         scriptCall('getLearningWorkspaceData'),
