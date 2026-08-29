@@ -43,18 +43,23 @@ jobs:
         id: live_snapshot
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           if [ -z "${PAGES_SNAPSHOT_DEPLOYMENT_ID:-}" ]; then
             echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "Live snapshot source is not configured; using committed fallback."
             exit 0
           fi
 
-          echo "configured=true" >> "$GITHUB_OUTPUT"
           SNAPSHOT_URL="https://script.google.com/macros/s/${PAGES_SNAPSHOT_DEPLOYMENT_ID}/exec?action=pages-snapshot"
-          curl --fail --silent --show-error --location --request POST \
+          if curl --fail --silent --show-error --location --request POST \
             "$SNAPSHOT_URL" \
-            --output site/data/snapshot.json
+            --output site/data/snapshot.json; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            rm -f site/data/snapshot.json
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Live snapshot is unavailable; using committed fallback."
+          fi
 
       - name: Materialize committed sanitized snapshot fallback
         if: steps.live_snapshot.outputs.configured != 'true'
