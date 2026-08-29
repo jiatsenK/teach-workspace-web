@@ -1,7 +1,7 @@
 import { esc } from '../lib/html.js';
 
 export function pageHeader(title, description) {
-  return `<div class="eyebrow">Learning workspace</div><h1 class="page-title">${esc(title)}</h1><p class="lead">${esc(description)}</p>`;
+  return `<div class="eyebrow">我的學習</div><h1 class="page-title">${esc(title)}</h1><p class="lead">${esc(description)}</p>`;
 }
 
 export function studioNav(courses, courseOrder, activeCourseId) {
@@ -12,10 +12,10 @@ export function studioNav(courses, courseOrder, activeCourseId) {
 }
 
 export function viewBar(activeView) {
+  const normalized = ['subject', 'course', 'unit'].includes(activeView) ? 'home' : activeView;
   return [
-    ['home', 'Learning Home'],
-    ['course', 'Course Workspace'],
-    ['progress', 'Progress / History'],
-    ['rhythm', '本月學習狀況'],
-  ].map(([key, label]) => `<button data-view="${key}" class="${activeView === key ? 'active' : ''}">${label}</button>`).join('');
+    ['home', '學習首頁'],
+    ['progress', '學習紀錄'],
+    ['rhythm', '本月學習'],
+  ].map(([key, label]) => `<button data-view="${key}" class="${normalized === key ? 'active' : ''}">${label}</button>`).join('');
 }
