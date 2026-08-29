@@ -33,15 +33,15 @@ function monthCalendar(monthly) {
     const events = sessions.map((session) => `<span class="calendar-event">${esc(session.name)}${Number(session.count || 0) > 1 ? ` ×${Number(session.count)}` : ''}</span>`).join('');
     cells.push(`<div class="calendar-cell ${date === today ? 'today' : ''}"><div class="calendar-date">${dayNumber}</div><div class="calendar-events">${events}</div></div>`);
   }
-  return `<div class="card calendar-card"><div class="calendar-wrap"><div class="month-calendar"><div class="calendar-weekdays">${['日', '一', '二', '三', '四', '五', '六'].map((item) => `<div class="calendar-weekday">週${item}</div>`).join('')}</div><div class="calendar-grid">${cells.join('')}</div></div></div><div class="calendar-note">月曆只顯示正式 <code>SESSION_LOG</code> 紀錄。</div></div>`;
+  return `<div class="card calendar-card"><div class="calendar-wrap"><div class="month-calendar"><div class="calendar-weekdays">${['日', '一', '二', '三', '四', '五', '六'].map((item) => `<div class="calendar-weekday">週${item}</div>`).join('')}</div><div class="calendar-grid">${cells.join('')}</div></div></div><div class="calendar-note">月曆只顯示已正式記錄的學習內容。</div></div>`;
 }
 
 export function monthView({ monthly }) {
-  if (!monthly) return '<div class="loading" style="min-height:260px">正在整理本月 Session…</div>';
-  return `<div class="eyebrow">Learning workspace</div><div class="month-title-row"><h1 class="page-title">本月學習狀況</h1><span class="month-tag">${esc(monthly.month?.label || '本月')}</span></div>
+  if (!monthly) return '<div class="loading" style="min-height:260px">正在整理本月學習紀錄…</div>';
+  return `<div class="eyebrow">我的學習</div><div class="month-title-row"><h1 class="page-title">本月學習狀況</h1><span class="month-tag">${esc(monthly.month?.label || '本月')}</span></div>
     <div class="month-summary">
-      <div class="card"><div class="summary-label">本月 Session</div><div class="summary-number">${Number(monthly.totalSessions || 0)}</div></div>
-      <div class="card"><div class="summary-label">學習日</div><div class="summary-number">${Number(monthly.activeDays || 0)}</div></div>
-      <div class="card"><div class="summary-label">有紀錄課程</div><div class="summary-number">${Number(monthly.activeCourses || 0)} / ${Number(monthly.totalCourses || 0)}</div></div>
+      <div class="card"><div class="summary-label">本月學習次數</div><div class="summary-number">${Number(monthly.totalSessions || 0)}</div></div>
+      <div class="card"><div class="summary-label">有學習的天數</div><div class="summary-number">${Number(monthly.activeDays || 0)}</div></div>
+      <div class="card"><div class="summary-label">本月有紀錄的課程</div><div class="summary-number">${Number(monthly.activeCourses || 0)} / ${Number(monthly.totalCourses || 0)}</div></div>
     </div>${monthCalendar(monthly)}`;
 }
