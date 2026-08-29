@@ -1,4 +1,4 @@
-import { esc } from '../lib/html.js';
+import { esc, learnerText } from '../lib/html.js';
 import { pageHeader, studioNav } from '../components/header.js';
 
 function weeklyCourseSessions(learning, course) {
@@ -6,7 +6,7 @@ function weeklyCourseSessions(learning, course) {
 }
 
 function readableText(course, value) {
-  let text = String(value || '');
+  let text = learnerText(value);
   if (course?.id === 'korean') {
     text = text.replace(/\bUnit\s+(\d+)\b/gi, '第 $1 課').replace(/\bCourse complete\b/gi, '課程已完成');
   }
@@ -16,7 +16,7 @@ function readableText(course, value) {
 function previewList(items, emptyText, limit = 3) {
   const values = (items || []).map((item) => typeof item === 'string' ? item : item.concept || item.label || '').filter(Boolean).slice(0, limit);
   if (!values.length) return `<p class="subtle" style="margin:8px 0 0">${esc(emptyText)}</p>`;
-  return `<ul style="margin:10px 0 0;padding-left:20px">${values.map((value) => `<li>${esc(value)}</li>`).join('')}</ul>`;
+  return `<ul style="margin:10px 0 0;padding-left:20px">${values.map((value) => `<li>${esc(learnerText(value))}</li>`).join('')}</ul>`;
 }
 
 function summaryCard(course) {
