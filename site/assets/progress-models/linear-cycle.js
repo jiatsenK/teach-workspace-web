@@ -1,7 +1,7 @@
-import { esc } from '../lib/html.js';
+import { esc, learnerText } from '../lib/html.js';
 
 function readableLabel(value) {
-  return String(value || '').replace(/\bUnit\s+(\d+)\b/gi, '第 $1 課').replace(/\bCourse complete\b/gi, '課程已完成').replace(/\bCurrent cycle\b/gi, '學習進度');
+  return learnerText(value).replace(/\bUnit\s+(\d+)\b/gi, '第 $1 課').replace(/\bCourse complete\b/gi, '課程已完成').replace(/\bCurrent cycle\b/gi, '學習進度');
 }
 
 function stepLabel(step, isUnitTrack) {
