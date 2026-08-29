@@ -39,14 +39,16 @@ jobs:
             return \`<article class="b2-reading-page"><div class="b2-reading-meta"><span>\${isJapanese ? '日文學習回合' : '考古題回合'}</span><span>\${esc(session.date || '')}</span></div><h1>\${esc(session.title || '未命名學習回合')}</h1><section class="b2-lede"><h2>本次學習範圍</h2><p>\${esc(session.learningScope || session.title || '目前沒有範圍摘要')}</p></section>\${sessionNote}<section class="b2-review-note"><h2>下次接續</h2><p>\${esc(session.reviewNeeded || coursePayload?.next || '目前沒有待接續項目')}</p></section></article>\`;
           }`;
           const sessionPattern = /function sessionReader\(session, coursePayload, subjectId\) \{[\s\S]*?\n\}\n\nfunction footprintView/;
-          if (!sessionPattern.test(app)) throw new Error('sessionReader pattern not found');
-          app = app.replace(sessionPattern, `${replacement}\n\nfunction footprintView`);
+          if (!app.includes('這次學習回合目前沒有已整理的學習內容')) {
+            if (!sessionPattern.test(app)) throw new Error('sessionReader pattern not found');
+            app = app.replace(sessionPattern, `${replacement}\n\nfunction footprintView`);
+          }
           fs.writeFileSync(appPath, app);
 
           const cssPath = 'site/prototype-b2/styles.css';
           let css = fs.readFileSync(cssPath, 'utf8');
-          css = css.replace('grid-template-columns: 1.2fr 0.85fr 1fr 1.1fr;\n    align-items: end;', 'grid-template-columns: repeat(4, minmax(0, 1fr));\n    align-items: stretch;');
-          css = css.replace(/\n\s*\.b2-subject--2 \{\n\s*min-height: 8rem;\n\s*\}\n\n\s*\.b2-subject--3 \{\n\s*min-height: 11rem;\n\s*\}/, '');
+          css = css.replace('grid-template-columns: 1.2fr 0.85fr 1fr 1.1fr; align-items: end;', 'grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch;');
+          css = css.replace('.b2-subject--2 { min-height: 8rem; }.b2-subject--3 { min-height: 11rem; }', '');
           fs.writeFileSync(cssPath, css);
           NODE
           node --check site/prototype-b2/app.js
