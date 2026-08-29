@@ -2,17 +2,21 @@
 
 Public GitHub Pages deployment target for Learning Studio.
 
-This repository is **not** the source of truth for courses, learner state, session history, progress rules, or frontend architecture. Canonical implementation and private data remain in the private `jiatsenK/teach-workspace` repository and Google Learning Data.
+This repository is a generated deployment mirror. Canonical frontend source, product decisions, and private learner state live in the private `jiatsenK/teach-workspace` repository.
 
 ## Runtime model
 
-- `site/` is a generated/static deployment mirror of `teach-workspace/pages/src/`.
-- `site/data/snapshot.json.gz.b64` is the compressed sanitized deployment input. CI materializes `snapshot.json`, validates it, then includes it in the Pages artifact; neither form is canonical learner state.
-- `scripts/validate-snapshot.mjs` enforces the public schema and rejects credential-, contact-, and URL-shaped values before deployment.
-- `scripts/validate-architecture.mjs` protects the view boundaries: Home stays summary-only, Course owns Project progress, and Progress/History owns review/history.
-- Progress/History may publish the explicitly whitelisted `SESSION_LOG` fields used for review/history, including `Review Needed` and `Learning Scope`.
-- Course Workspace receives only normalized progress-model data. Raw `STATE.md`, `LEARNER_STATE.md`, corrections, answers, credentials, and private source files are not published.
+- `site/` is static public output generated from the canonical Git source.
+- `site/data/snapshot.json.gz.b64` is sanitized deployment data; CI materializes and validates `snapshot.json` before publishing.
+- `scripts/validate-snapshot.mjs` rejects non-whitelisted or sensitive public data.
+- `scripts/validate-architecture.mjs` protects frontend information boundaries.
 
-The existing GAS Learning Studio remains private. Public Pages does not fetch that private deployment directly.
+## Publishing
 
-If Learning Studio changes, regenerate this deployment mirror from `teach-workspace`; do not redesign the public copy independently.
+The public pipeline is Git-only:
+
+`validated sanitized projection → commit to teach-workspace-web → GitHub Actions → GitHub Pages`
+
+No private GAS deployment is fetched or polled, and GAS is not a synchronization bridge or deployment trigger. A push that changes `site/**` immediately starts validation and Pages deployment.
+
+Do not edit this mirror as an independent product source. Generate public output from the canonical private repository and publish only sanitized data.
