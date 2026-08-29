@@ -38,6 +38,70 @@ jobs:
       - name: Materialize sanitized snapshot
         run: base64 -d site/data/snapshot.json.gz.b64 | gunzip > site/data/snapshot.json
 
+      - name: Merge Korean Unit 4 sanitized projection
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const file = 'site/data/snapshot.json';
+          const snapshot = JSON.parse(fs.readFileSync(file, 'utf8'));
+          const hierarchyCourse = snapshot.learning?.hierarchy?.courses?.find((course) => course.id === 'korean');
+          const unit = hierarchyCourse?.units?.find((item) => item.id === 'UNIT-04');
+          if (!unit || !snapshot.learning?.courses?.korean) throw new Error('Korean Unit 4 snapshot target not found');
+
+          unit.sourceRange = '第4課首頁、首頁後首段（頁碼未入鏡）、p.107–114';
+          unit.outline = [
+            '能詢問並回答去哪裡、在某處做什麼。',
+            '使用 에 表示移動目的地，使用 에서 表示動作發生的場所。',
+            '使用 이/그/저 指示事物、人物或場所。',
+          ];
+          unit.content = [
+            { id: 'CONTENT-0016', type: '學習目標', label: '어디에서 무엇을 하는지 묻고 답할 수 있다.', explanation: '能詢問並回答在某處做什麼。', sourceRange: '第4課首頁' },
+            { id: 'CONTENT-0017', type: '文法', label: '에 가다', explanation: '表示移動到某個目的地；詢問去處時可用 어디에 가요?，回答以場所＋에 가요。', sourceRange: '首頁後首段（頁碼未入鏡）' },
+            { id: 'CONTENT-0018', type: '學習情境', label: '장소와 목적지', explanation: '以城市與日常場所為主題，辨識並表達要去的地點。', sourceRange: '首頁後首段（頁碼未入鏡）、p.107–108' },
+            { id: 'CONTENT-0019', type: '文法', label: '에서', explanation: '表示某個動作發生的場所；可用「N에 가요」與「N에서 V-아요/어요」區分目的地與動作場所。', sourceRange: 'p.109' },
+            { id: 'CONTENT-0020', type: '句型', label: '어디에서 무엇을 해요?', explanation: '詢問「在哪裡做什麼？」；回答可用場所＋에서＋活動動詞。', sourceRange: 'p.109–112' },
+            { id: 'CONTENT-0021', type: '文法', label: '이/그/저 + 명사', explanation: '이 表示靠近說話者，그 表示靠近聽者，저 表示離雙方都較遠，用來指示事物、人物或場所。', sourceRange: 'p.113–114' },
+            { id: 'CONTENT-0022', type: '整合句型', label: '어디에 가요? → N에 가요. / 거기에서 무엇을 해요? → N에서 V-아요/어요.', explanation: '把「去哪裡」與「到那裡做什麼」串成一組完整互動。', sourceRange: 'p.112–114' },
+          ];
+
+          const vocabulary = [
+            ['VOC-0079','장소','場所、地點','','第4課首頁'],
+            ['VOC-0080','백화점','百貨公司','','首頁後首段（頁碼未入鏡）'],
+            ['VOC-0081','우체국','郵局','','首頁後首段（頁碼未入鏡）'],
+            ['VOC-0082','은행','銀行','','首頁後首段（頁碼未入鏡）'],
+            ['VOC-0083','가게','商店、店家','','首頁後首段（頁碼未入鏡）'],
+            ['VOC-0084','시장','市場','','首頁後首段（頁碼未入鏡）、p.114'],
+            ['VOC-0085','영화관','電影院','','p.107'],
+            ['VOC-0086','공항','機場','','p.107'],
+            ['VOC-0087','약국','藥局','','p.107–108'],
+            ['VOC-0088','병원','醫院','','p.107–108'],
+            ['VOC-0089','카페','咖啡廳','','p.107, p.109–111'],
+            ['VOC-0090','편의점','便利商店','','p.107'],
+            ['VOC-0091','식당','餐廳','','p.107–112'],
+            ['VOC-0092','공원','公園','','p.107, p.110–113'],
+            ['VOC-0093','도서관','圖書館','','p.107, p.110–111'],
+            ['VOC-0094','회사','公司','','p.107, p.110'],
+            ['VOC-0095','집','家、住家','','p.107, p.109–110'],
+            ['VOC-0096','방','房間','','p.111'],
+            ['VOC-0097','알다','知道、認識','알아요','p.112（手寫補充）'],
+            ['VOC-0098','좋아하다','喜歡','좋아해요','p.112（手寫補充）'],
+            ['VOC-0099','쇼핑하다','購物','쇼핑해요','p.112（手寫補充）'],
+            ['VOC-0100','거기','那裡','','p.112–114'],
+            ['VOC-0101','게임','遊戲','','p.109, p.111'],
+            ['VOC-0102','커피','咖啡','','p.109, p.111'],
+            ['VOC-0103','물','水','','p.111'],
+          ];
+          unit.vocabulary = vocabulary.map(([id, word, meaning, form, sourceRange]) => ({
+            id, word, meaning, form, memoryStatus: '待複習', sourceRange,
+          }));
+
+          snapshot.learning.courses.korean.next = '開始 Unit 4：場所詞彙與目的地 에 가다';
+          snapshot.learning.courses.korean.priority = 'Unit 4 教材已攝取，接下來進行場所與位置表達學習';
+          snapshot.generatedAt = new Date().toISOString();
+          fs.writeFileSync(file, JSON.stringify(snapshot));
+          NODE
+
       - name: Validate public snapshot
         run: node scripts/validate-snapshot.mjs site/data/snapshot.json
 
