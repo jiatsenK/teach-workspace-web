@@ -123,7 +123,16 @@ function unitReader(unit) {
 function sessionReader(session, coursePayload, subjectId) {
   if (!session) return '<div class="b2-empty-reader"><strong>目前沒有可顯示的學習回合。</strong><span>這是 snapshot 資料限制，不是導覽失效。</span></div>';
   const isJapanese = subjectId === 'japanese';
-  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>${isJapanese ? '日文學習回合' : '考古題回合'}</span><span>${esc(session.date || '')}</span></div><h1>${esc(session.title || '未命名學習回合')}</h1><section class="b2-lede"><h2>本次範圍</h2><p>${esc(session.learningScope || session.title || '目前沒有範圍摘要')}</p></section><section class="b2-review-note"><h2>下次接續</h2><p>${esc(session.reviewNeeded || coursePayload?.next || '目前沒有待接續項目')}</p></section><section class="b2-data-note"><strong>${isJapanese ? '這不是完整日文教材頁。' : '這是考古題學習紀錄摘要。'}</strong><p>${isJapanese ? '目前 schema v3 沒有日文 Unit／教材本文；B2 先把每次 Session 當作一頁，測試你要的閱讀方式。' : '目前公開 snapshot 尚未提供完整 EXAM_BANK 題目與答案內容。'}</p></section></article>`;
+  const content = Array.isArray(session.content) ? session.content : [];
+  const vocabulary = Array.isArray(session.vocabulary) ? session.vocabulary : [];
+  const japaneseLearningContent = `<div class="b2-content-blocks">${content.length
+    ? content.map((item) => `<section><span>${esc(item.type || '學習內容')}</span><h2>${esc(item.label || '本次重點')}</h2><p>${esc(item.explanation || '')}</p></section>`).join('')
+    : '<section class="b2-data-note"><strong>這次學習回合目前沒有已整理的學習內容。</strong><p>整理完成的文法、自然表達與搭配會直接顯示在這裡。</p></section>'}</div>
+    ${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}`;
+  const sessionNote = isJapanese
+    ? japaneseLearningContent
+    : '<section class="b2-data-note"><strong>這是考古題學習紀錄摘要。</strong><p>目前公開 snapshot 尚未提供完整 EXAM_BANK 題目與答案內容。</p></section>';
+  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>${isJapanese ? '日文學習回合' : '考古題回合'}</span><span>${esc(session.date || '')}</span></div><h1>${esc(session.title || '未命名學習回合')}</h1><section class="b2-lede"><h2>本次學習範圍</h2><p>${esc(session.learningScope || session.title || '目前沒有範圍摘要')}</p></section>${sessionNote}<section class="b2-review-note"><h2>下次接續</h2><p>${esc(session.reviewNeeded || coursePayload?.next || '目前沒有待接續項目')}</p></section></article>`;
 }
 
 function footprintView(coursePayload) {
