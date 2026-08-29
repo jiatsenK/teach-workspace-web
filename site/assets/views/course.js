@@ -1,9 +1,9 @@
-import { esc } from '../lib/html.js';
+import { esc, learnerText } from '../lib/html.js';
 import { pageHeader } from '../components/header.js';
 import { renderProjectProgress } from '../progress-models/index.js';
 
 function readableText(course, value) {
-  let text = String(value || '');
+  let text = learnerText(value);
   if (course?.id === 'korean') {
     text = text.replace(/\bUnit\s+(\d+)\b/gi, '第 $1 課').replace(/\bCourse complete\b/gi, '課程已完成');
   }
@@ -13,7 +13,7 @@ function readableText(course, value) {
 function evidenceSummary(course) {
   const items = course?.evidence || [];
   if (!items.length) return '<div class="empty">目前沒有可顯示的學習狀況。</div>';
-  return `<div class="evidence">${items.map((item) => `<div class="evidence-item"><span class="${item.status === 'ok' ? 'status-ok' : 'status-warn'}">${item.status === 'ok' ? '✓' : '△'}</span><span>${esc(item.text)}</span></div>`).join('')}</div>`;
+  return `<div class="evidence">${items.map((item) => `<div class="evidence-item"><span class="${item.status === 'ok' ? 'status-ok' : 'status-warn'}">${item.status === 'ok' ? '✓' : '△'}</span><span>${esc(readableText(course, item.text))}</span></div>`).join('')}</div>`;
 }
 
 export function courseView({ course }) {
