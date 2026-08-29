@@ -9,6 +9,8 @@ on:
       - 'scripts/validate-architecture.mjs'
       - '.github/workflows/deploy-pages.yml'
   workflow_dispatch:
+  schedule:
+    - cron: '*/15 * * * *'
 
 permissions:
   contents: read
@@ -25,6 +27,8 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      PAGES_SNAPSHOT_DEPLOYMENT_ID: ${{ secrets.PAGES_SNAPSHOT_DEPLOYMENT_ID }}
 
     steps:
       - name: Checkout repository
@@ -35,7 +39,25 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Materialize sanitized snapshot
+      - name: Refresh sanitized snapshot from Apps Script
+        id: live_snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${PAGES_SNAPSHOT_DEPLOYMENT_ID:-}" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Live snapshot source is not configured; using committed fallback."
+            exit 0
+          fi
+
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+          SNAPSHOT_URL="https://script.google.com/macros/s/${PAGES_SNAPSHOT_DEPLOYMENT_ID}/exec?action=pages-snapshot"
+          curl --fail --silent --show-error --location --request POST \
+            "$SNAPSHOT_URL" \
+            --output site/data/snapshot.json
+
+      - name: Materialize committed sanitized snapshot fallback
+        if: steps.live_snapshot.outputs.configured != 'true'
         run: base64 -d site/data/snapshot.json.gz.b64 | gunzip > site/data/snapshot.json
 
       - name: Validate public snapshot
