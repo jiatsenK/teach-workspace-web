@@ -1,0 +1,63 @@
+name: Patch B2 UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-b2-ui.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Patch B2 reader and subject card sizing
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const appPath = 'site/prototype-b2/app.js';
+          let app = fs.readFileSync(appPath, 'utf8');
+          const replacement = `function sessionReader(session, coursePayload, subjectId) {
+            if (!session) return '<div class="b2-empty-reader"><strong>目前沒有可顯示的學習回合。</strong><span>這是 snapshot 資料限制，不是導覽失效。</span></div>';
+            const isJapanese = subjectId === 'japanese';
+            const content = Array.isArray(session.content) ? session.content : [];
+            const vocabulary = Array.isArray(session.vocabulary) ? session.vocabulary : [];
+            const japaneseLearningContent = \`<div class="b2-content-blocks">\${content.length
+              ? content.map((item) => \`<section><span>\${esc(item.type || '學習內容')}</span><h2>\${esc(item.label || '本次重點')}</h2><p>\${esc(item.explanation || '')}</p></section>\`).join('')
+              : '<section class="b2-data-note"><strong>這次學習回合目前沒有已整理的學習內容。</strong><p>整理完成的文法、自然表達與搭配會直接顯示在這裡。</p></section>'}</div>
+              \${vocabulary.length ? \`<section class="b2-vocab"><h2>單字與表達</h2>\${vocabulary.map((item) => \`<div><b>\${esc(item.word)}</b><span>\${esc(item.meaning)}</span><small>\${esc(item.memoryStatus || '未開始')}</small></div>\`).join('')}</section>\` : ''}\`;
+            const sessionNote = isJapanese
+              ? japaneseLearningContent
+              : '<section class="b2-data-note"><strong>這是考古題學習紀錄摘要。</strong><p>目前公開 snapshot 尚未提供完整 EXAM_BANK 題目與答案內容。</p></section>';
+            return \`<article class="b2-reading-page"><div class="b2-reading-meta"><span>\${isJapanese ? '日文學習回合' : '考古題回合'}</span><span>\${esc(session.date || '')}</span></div><h1>\${esc(session.title || '未命名學習回合')}</h1><section class="b2-lede"><h2>本次學習範圍</h2><p>\${esc(session.learningScope || session.title || '目前沒有範圍摘要')}</p></section>\${sessionNote}<section class="b2-review-note"><h2>下次接續</h2><p>\${esc(session.reviewNeeded || coursePayload?.next || '目前沒有待接續項目')}</p></section></article>\`;
+          }`;
+          const sessionPattern = /function sessionReader\(session, coursePayload, subjectId\) \{[\s\S]*?\n\}\n\nfunction footprintView/;
+          if (!sessionPattern.test(app)) throw new Error('sessionReader pattern not found');
+          app = app.replace(sessionPattern, `${replacement}\n\nfunction footprintView`);
+          fs.writeFileSync(appPath, app);
+
+          const cssPath = 'site/prototype-b2/styles.css';
+          let css = fs.readFileSync(cssPath, 'utf8');
+          css = css.replace('grid-template-columns: 1.2fr 0.85fr 1fr 1.1fr;\n    align-items: end;', 'grid-template-columns: repeat(4, minmax(0, 1fr));\n    align-items: stretch;');
+          css = css.replace(/\n\s*\.b2-subject--2 \{\n\s*min-height: 8rem;\n\s*\}\n\n\s*\.b2-subject--3 \{\n\s*min-height: 11rem;\n\s*\}/, '');
+          fs.writeFileSync(cssPath, css);
+          NODE
+          node --check site/prototype-b2/app.js
+          grep -q 'repeat(4, minmax(0, 1fr))' site/prototype-b2/styles.css
+          ! grep -q '這不是完整日文教材頁' site/prototype-b2/app.js
+      - name: Commit UI patch
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add site/prototype-b2/app.js site/prototype-b2/styles.css
+          git diff --cached --quiet && exit 0
+          git commit -m 'fix: show Japanese session learning content in B2'
+          git push origin HEAD:main
