@@ -7,5 +7,5 @@ export function renderProjectProgress(progress) {
   if (progress.model === 'linear-cycle') return renderLinearCycle(progress);
   if (progress.model === 'dynamic-gaps') return renderDynamicGaps(progress);
   if (progress.model === 'expanding-map') return renderExpandingMap(progress);
-  return '<div class="empty">尚無對應的 progress model。</div>';
+  return '<div class="empty">目前沒有可顯示的進度內容。</div>';
 }
