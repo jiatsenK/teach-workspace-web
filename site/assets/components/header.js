@@ -12,10 +12,10 @@ export function studioNav(courses, courseOrder, activeCourseId) {
 }
 
 export function viewBar(activeView) {
+  const normalized = ['subject', 'course', 'unit'].includes(activeView) ? 'home' : activeView;
   return [
     ['home', '學習首頁'],
-    ['course', '學習內容'],
     ['progress', '學習紀錄'],
     ['rhythm', '本月學習'],
-  ].map(([key, label]) => `<button data-view="${key}" class="${activeView === key ? 'active' : ''}">${label}</button>`).join('');
+  ].map(([key, label]) => `<button data-view="${key}" class="${normalized === key ? 'active' : ''}">${label}</button>`).join('');
 }
