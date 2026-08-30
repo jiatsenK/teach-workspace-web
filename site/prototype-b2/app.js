@@ -95,8 +95,10 @@ function fixedUnitList(course, selectedUnitId) {
   return (course?.units || []).map((unit) => `<button type="button" data-proto-unit="${esc(unit.id)}" data-proto-course="${esc(course.id)}" class="b2-lesson-link ${unit.id === selectedUnitId ? 'is-active' : ''}"><span>${String(unit.number ?? '').padStart(2, '0')}</span><strong>${esc(unit.name)}</strong><small>${unit.content?.length ? `${unit.content.length} 段課文` : unit.status === 'done' ? '完成' : unit.status === 'current' ? '目前' : '待學'}</small></button>`).join('');
 }
 
-function sessionList(coursePayload, selectedLessonId, courseId) {
-  return (coursePayload?.historySessions || coursePayload?.sessions || []).map((session) => `<button type="button" data-proto-lesson="${esc(session.sessionId)}" data-proto-course="${esc(courseId)}" class="b2-lesson-link ${session.sessionId === selectedLessonId ? 'is-active' : ''}"><span>${esc((session.date || '').slice(5))}</span><strong>${esc(session.title || '未命名學習回合')}</strong><small>學習回合</small></button>`).join('');
+function sessionList(coursePayload, hierarchyCourse, selectedLessonId, courseId) {
+  const courseMaterials = (hierarchyCourse?.courseContent || []).length + (hierarchyCourse?.courseVocabulary || []).length;
+  const materialsLink = courseMaterials ? `<button type="button" data-proto-lesson="course-materials" data-proto-course="${esc(courseId)}" class="b2-lesson-link ${selectedLessonId === 'course-materials' ? 'is-active' : ''}"><span>＋</span><strong>課程整理</strong><small>${courseMaterials} 筆跨回合內容</small></button>` : '';
+  return materialsLink + (coursePayload?.historySessions || coursePayload?.sessions || []).map((session) => `<button type="button" data-proto-lesson="${esc(session.sessionId)}" data-proto-course="${esc(courseId)}" class="b2-lesson-link ${session.sessionId === selectedLessonId ? 'is-active' : ''}"><span>${esc((session.date || '').slice(5))}</span><strong>${esc(session.title || '未命名學習回合')}</strong><small>學習回合</small></button>`).join('');
 }
 
 function constructionBranches(mode, coursePayload, hierarchyCourse) {
@@ -109,7 +111,7 @@ function rail(data) {
   const { subjects, courseMap, selectedSubject, selectedCourse, selectedCoursePayload, selectedUnit, selectedLessonId, mode, closed } = data;
   const courses = allCourseIds(selectedSubject).map((id) => courseMap[id]).filter(Boolean);
   const useSessions = selectedSubject?.id === 'japanese' || (selectedSubject?.id === 'construction' && mode === 'exam');
-  const lessonList = useSessions ? sessionList(selectedCoursePayload, selectedLessonId, selectedCourse?.id) : fixedUnitList(selectedCourse, selectedUnit?.id);
+  const lessonList = useSessions ? sessionList(selectedCoursePayload, selectedCourse, selectedLessonId, selectedCourse?.id) : fixedUnitList(selectedCourse, selectedUnit?.id);
   return `<aside class="b2-rail ${closed ? 'is-closed' : ''}"><div class="b2-rail__head"><button type="button" data-proto-nav-toggle aria-label="${closed ? '展開課程目錄' : '收起課程目錄'}">${closed ? '展開目錄' : '收起目錄'}</button><div><span>${esc(selectedSubject?.name || '')}</span><strong>${esc(selectedCourse?.name || '')}</strong></div></div><div class="b2-rail__body"><div class="b2-subject-shortcuts">${subjects.map((subject) => `<button type="button" data-proto-subject="${esc(subject.id)}" class="${subject.id === selectedSubject?.id ? 'is-active' : ''}">${esc(subject.name)}</button>`).join('')}</div>${courses.length > 1 ? `<div class="b2-course-list">${courses.map((course) => `<button type="button" data-proto-course="${esc(course.id)}" class="${course.id === selectedCourse?.id ? 'is-active' : ''}">${esc(course.name)}</button>`).join('')}</div>` : ''}${selectedSubject?.id === 'construction' ? constructionBranches(mode, selectedCoursePayload, selectedCourse) : ''}<div class="b2-lesson-list">${lessonList || '<p class="proto-empty">目前 snapshot 沒有可列出的課次。</p>'}</div></div></aside>`;
 }
 
@@ -117,7 +119,13 @@ function unitReader(unit) {
   if (!unit) return '<div class="b2-empty-reader"><strong>選一課開始閱讀。</strong><span>課文會固定出現在這個區域，不會跑到清單最下面。</span></div>';
   const content = unit.content || [];
   const vocabulary = unit.vocabulary || [];
-  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>第 ${Number(unit.number || 0)} 課</span><span>${esc(unit.sourceRange || '目前未標示教材範圍')}</span></div><h1>${esc(unit.name || '未命名課次')}</h1>${(unit.outline || []).length ? `<section class="b2-lede"><h2>這一課要學什麼</h2><ul>${unit.outline.map((item) => `<li>${esc(item)}</li>`).join('')}</ul></section>` : ''}<div class="b2-content-blocks">${content.length ? content.map((item) => `<section><span>${esc(item.type || '教材內容')}</span><h2>${esc(item.label || '本課重點')}</h2><p>${esc(item.explanation || '')}</p>${item.sourceRange ? `<small>來源：${esc(item.sourceRange)}</small>` : ''}</section>`).join('') : '<section class="b2-data-note"><strong>這一課目前只有課綱。</strong><p>不是介面藏起來；目前公開 snapshot 還沒有這一課的教材內容。</p></section>'}</div>${vocabulary.length ? `<section class="b2-vocab"><h2>單字與記憶</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}</article>`;
+  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>第 ${Number(unit.number || 0)} 課</span><span>${esc(unit.sourceRange || '目前未標示教材範圍')}</span></div><h1>${esc(unit.name || '未命名課次')}</h1>${(unit.outline || []).length ? `<section class="b2-lede"><h2>這一課要學什麼</h2><ul>${unit.outline.map((item) => `<li>${esc(item)}</li>`).join('')}</ul></section>` : ''}<div class="b2-content-blocks">${content.length ? content.map((item) => `<section><span>${esc(item.type || '教材內容')}</span><h2>${esc(item.label || '本課重點')}</h2><p>${esc(item.explanation || '')}</p>${item.sourceRange ? `<small>來源：${esc(item.sourceRange)}</small>` : ''}</section>`).join('') : '<section class="b2-data-note"><strong>這一課目前只有課綱。</strong><p>Learning Data 目前沒有這一課已確認的教材內容。</p></section>'}</div>${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>學習狀態：${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}</article>`;
+}
+
+function courseMaterialsReader(course) {
+  const content = course?.courseContent || [];
+  const vocabulary = course?.courseVocabulary || [];
+  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>課程整理</span><span>不建立假 Unit 或假 Session</span></div><h1>跨回合教材與表達</h1><section class="b2-lede"><h2>為什麼放在這裡</h2><p>這些內容已整理進 Learning Data，但沒有可確認的單一學習回合關聯，因此保留在課程層級。</p></section><div class="b2-content-blocks">${content.map((item) => `<section><span>${esc(item.type || '教材內容')}</span><h2>${esc(item.label || '課程重點')}</h2><p>${esc(item.explanation || '')}</p></section>`).join('')}</div>${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>學習狀態：${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}</article>`;
 }
 
 function sessionReader(session, coursePayload, subjectId) {
@@ -128,7 +136,7 @@ function sessionReader(session, coursePayload, subjectId) {
   const japaneseLearningContent = `<div class="b2-content-blocks">${content.length
     ? content.map((item) => `<section><span>${esc(item.type || '學習內容')}</span><h2>${esc(item.label || '本次重點')}</h2><p>${esc(item.explanation || '')}</p></section>`).join('')
     : '<section class="b2-data-note"><strong>這次學習回合目前沒有已整理的學習內容。</strong><p>整理完成的文法、自然表達與搭配會直接顯示在這裡。</p></section>'}</div>
-    ${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}`;
+    ${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>學習狀態：${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}`;
   const sessionNote = isJapanese
     ? japaneseLearningContent
     : '<section class="b2-data-note"><strong>這是考古題學習紀錄摘要。</strong><p>目前公開 snapshot 尚未提供完整 EXAM_BANK 題目與答案內容。</p></section>';
@@ -145,10 +153,15 @@ function learningView(data) {
   const closed = params.get('pnav') === 'closed';
   const mode = data.selectedSubject?.id === 'construction' ? (params.get('pmode') || 'exam') : '';
   const sessions = data.selectedCoursePayload?.historySessions || data.selectedCoursePayload?.sessions || [];
-  const selectedLessonId = params.get('plesson') || sessions[0]?.sessionId || '';
+  const hasCourseMaterials = (data.selectedCourse?.courseContent || []).length + (data.selectedCourse?.courseVocabulary || []).length > 0;
+  const selectedLessonId = params.get('plesson') || (hasCourseMaterials ? 'course-materials' : sessions[0]?.sessionId) || '';
   const selectedSession = sessions.find((item) => item.sessionId === selectedLessonId) || sessions[0];
   const useSessions = data.selectedSubject?.id === 'japanese' || (data.selectedSubject?.id === 'construction' && mode === 'exam');
-  const content = section === 'history' ? footprintView(data.selectedCoursePayload) : useSessions ? sessionReader(selectedSession, data.selectedCoursePayload, data.selectedSubject?.id) : unitReader(data.selectedUnit);
+  const content = section === 'history'
+    ? footprintView(data.selectedCoursePayload)
+    : useSessions
+      ? selectedLessonId === 'course-materials' ? courseMaterialsReader(data.selectedCourse) : sessionReader(selectedSession, data.selectedCoursePayload, data.selectedSubject?.id)
+      : unitReader(data.selectedUnit);
   return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${rail({ ...data, selectedLessonId, mode, closed })}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-nav-jump>查看目錄</button><button type="button" data-proto-section="learn" class="${section === 'learn' ? 'is-active' : ''}">讀課文</button><button type="button" data-proto-section="history" class="${section === 'history' ? 'is-active' : ''}">看學習足跡</button><small>${section === 'history' ? '查看這門課最近學過什麼' : '一次只看一課'}</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
 }
 
