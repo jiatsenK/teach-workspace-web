@@ -1,11 +1,32 @@
 (() => {
+  const LIVE_DATA_URL = 'https://script.google.com/macros/s/AKfycbxefSrx96-xt03xzwi_pZIjeOBwKSsspyeg7nK64TN9MZRQMJfYGLi12h-pCdP1P1SDTw/exec?action=pages-snapshot';
+  const FALLBACK_DATA_URL = './data/snapshot.json';
+  const LIVE_TIMEOUT_MS = 5000;
   let snapshotPromise = null;
+
+  function isValidSnapshot(snapshot) {
+    return Boolean(snapshot && snapshot.schemaVersion === 3 && snapshot.learning && snapshot.monthly);
+  }
+
+  async function fetchJson(url, timeoutMs) {
+    const controller = new AbortController();
+    const timer = timeoutMs ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+      const response = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      if (!response.ok) throw new Error(`Data request failed: ${response.status}`);
+      const payload = await response.json();
+      if (!isValidSnapshot(payload)) throw new Error('Learning data response is invalid.');
+      return payload;
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
 
   function loadSnapshot() {
     if (!snapshotPromise) {
-      snapshotPromise = fetch('./data/snapshot.json', { cache: 'no-store' }).then((response) => {
-        if (!response.ok) throw new Error(`Snapshot request failed: ${response.status}`);
-        return response.json();
+      snapshotPromise = fetchJson(LIVE_DATA_URL, LIVE_TIMEOUT_MS).catch((liveError) => {
+        console.warn('Live learning data unavailable; using the latest published copy.', liveError);
+        return fetchJson(FALLBACK_DATA_URL, 0);
       });
     }
     return snapshotPromise;
