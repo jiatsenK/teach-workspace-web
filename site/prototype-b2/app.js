@@ -38,7 +38,7 @@ function topbar(section) {
     <button type="button" class="b2-brand" data-proto-home aria-label="回到學習首頁"><span class="b-character" aria-hidden="true"><i></i></span><strong>我的學習</strong></button>
     <nav aria-label="全域頁面">
       <button type="button" data-proto-home class="${!section ? 'is-active' : ''}">首頁</button>
-      <button type="button" data-proto-section="month" class="${section === 'month' ? 'is-active' : ''}">全部科目月曆</button>
+      <button type="button" data-proto-section="month" class="${section === 'month' ? 'is-active' : ''}">本月學習狀況</button>
     </nav>
   </header>`;
 }
@@ -65,7 +65,7 @@ function homeView(subjects, courseMap) {
 function monthCalendar(monthly) {
   const year = Number(monthly?.month?.year || 0);
   const month = Number(monthly?.month?.month || 0);
-  if (!year || !month) return '<div class="proto-empty">目前沒有可顯示的月份資料。</div>';
+  if (!year || !month) return '<div class="b2-chart-empty">目前沒有可顯示的月份資料。</div>';
   const eventMap = Object.fromEntries((monthly.days || []).map((day) => [day.date, day.sessions || []]));
   const firstDay = new Date(year, month - 1, 1).getDay();
   const daysInMonth = new Date(year, month, 0).getDate();
@@ -81,13 +81,61 @@ function monthCalendar(monthly) {
   return `<div class="b2-calendar"><div class="b2-calendar__week">${['日','一','二','三','四','五','六'].map((day) => `<span>週${day}</span>`).join('')}</div><div class="b2-calendar__grid">${cells.join('')}</div></div>`;
 }
 
+function monthCourseChart(monthly) {
+  const courses = monthly?.courses || [];
+  if (!courses.length) return '<div class="b2-chart-empty">目前沒有課程統計。</div>';
+  const maxSessions = Math.max(1, ...courses.map((course) => Number(course.sessions || 0)));
+  return `<div class="b2-course-bars" aria-label="各課程本月學習次數">${courses.map((course) => {
+    const sessions = Number(course.sessions || 0);
+    const width = Math.round((sessions / maxSessions) * 100);
+    return `<div class="b2-course-bar"><strong>${esc(course.short || course.name)}</strong><div class="b2-course-bar__track"><div class="b2-course-bar__fill" style="--bar:${width}%"></div></div><span>${sessions}</span></div>`;
+  }).join('')}</div>`;
+}
+
+function monthRhythmChart(monthly) {
+  const year = Number(monthly?.month?.year || 0);
+  const month = Number(monthly?.month?.month || 0);
+  if (!year || !month) return '<div class="b2-chart-empty">目前沒有學習節奏資料。</div>';
+  const counts = Object.fromEntries((monthly.days || []).map((day) => [day.date, (day.sessions || []).reduce((sum, item) => sum + Number(item.count || 1), 0)]));
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const series = Array.from({ length: daysInMonth }, (_, index) => {
+    const day = index + 1;
+    const date = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return { day, count: Number(counts[date] || 0) };
+  });
+  const maxCount = Math.max(1, ...series.map((item) => item.count));
+  return `<div class="b2-daily-rhythm"><p>每天實際打開課程的次數，空白日也保留。</p><div class="b2-daily-bars" style="--days:${daysInMonth}" aria-label="每日學習次數">${series.map((item) => {
+    const height = Math.round((item.count / maxCount) * 100);
+    const showLabel = item.day === 1 || item.day === daysInMonth || item.day % 5 === 0;
+    return `<div class="b2-daily-bar ${item.count ? '' : 'is-zero'}" title="${item.day} 日：${item.count} 次"><i style="--bar:${height}%"></i><span>${showLabel ? item.day : ''}</span></div>`;
+  }).join('')}</div></div>`;
+}
+
+function monthPanel(monthly, view) {
+  if (view === 'courses') return monthCourseChart(monthly);
+  if (view === 'rhythm') return monthRhythmChart(monthly);
+  return monthCalendar(monthly);
+}
+
 function monthView(monthly) {
+  const view = params.get('pmonthview') || 'calendar';
   return `<main class="b2-month-screen">
-    <div class="b2-month-head"><div><span>全部科目</span><h1>本月學習狀況</h1><p>這是跨科目的總覽，所以不放在任何一門課的側欄裡。</p></div><strong>${esc(monthly?.month?.label || '本月')}</strong></div>
-    <section class="b2-month-stats"><article><span>學習次數</span><b>${Number(monthly?.totalSessions || 0)}</b></article><article><span>有學習的天數</span><b>${Number(monthly?.activeDays || 0)}</b></article><article><span>有紀錄的課程</span><b>${Number(monthly?.activeCourses || 0)} / ${Number(monthly?.totalCourses || 0)}</b></article></section>
-    <section class="b2-course-tally">${(monthly?.courses || []).map((course) => `<article><strong>${esc(course.short || course.name)}</strong><span>${Number(course.sessions || 0)} 次</span><small>最近 ${esc(course.lastDate || '—')}</small></article>`).join('')}</section>
-    ${monthCalendar(monthly)}
-    <footer class="b2-statement"><p>月曆看整體節奏，不假裝代表學會了多少。</p></footer>
+    <div class="b2-month-head"><div><span>全部科目</span><h1>本月學習狀況</h1></div><strong>${esc(monthly?.month?.label || '本月')}</strong></div>
+    <div class="b2-month-layout">
+      <section class="b2-month-visual">
+        <div class="b2-month-switch" aria-label="切換本月圖表">
+          <button type="button" data-month-view="calendar" class="${view === 'calendar' ? 'is-active' : ''}">月曆</button>
+          <button type="button" data-month-view="courses" class="${view === 'courses' ? 'is-active' : ''}">課程分布</button>
+          <button type="button" data-month-view="rhythm" class="${view === 'rhythm' ? 'is-active' : ''}">每日節奏</button>
+        </div>
+        <div class="b2-month-panel">${monthPanel(monthly, view)}</div>
+      </section>
+      <aside class="b2-month-summary" aria-label="本月摘要">
+        <h2>本月摘要</h2>
+        <section class="b2-month-stats"><article><span>學習次數</span><b>${Number(monthly?.totalSessions || 0)}</b></article><article><span>有學習的天數</span><b>${Number(monthly?.activeDays || 0)}</b></article><article><span>有紀錄的課程</span><b>${Number(monthly?.activeCourses || 0)} / ${Number(monthly?.totalCourses || 0)}</b></article></section>
+        <section class="b2-course-tally">${(monthly?.courses || []).map((course) => `<article><strong>${esc(course.short || course.name)}</strong><span>${Number(course.sessions || 0)} 次</span><small>最近 ${esc(course.lastDate || '—')}</small></article>`).join('')}</section>
+      </aside>
+    </div>
   </main>`;
 }
 
@@ -175,7 +223,8 @@ function render() {
 document.addEventListener('click', (event) => {
   const target = event.target instanceof Element ? event.target.closest('button') : null;
   if (!target) return;
-  if (target.hasAttribute('data-proto-home')) return setParams({ psubject:'', pcourse:'', punit:'', plesson:'', pmode:'', psection:'', pnav:'' });
+  if (target.dataset.monthView) return setParams({ pmonthview: target.dataset.monthView });
+  if (target.hasAttribute('data-proto-home')) return setParams({ psubject:'', pcourse:'', punit:'', plesson:'', pmode:'', psection:'', pnav:'', pmonthview:'' });
   if (target.dataset.protoSubject) return setParams({ psubject:target.dataset.protoSubject, pcourse:'', punit:'', plesson:'', pmode:'', psection:'learn' });
   if (target.dataset.protoSection) return setParams({ psection:target.dataset.protoSection });
   if (target.hasAttribute('data-proto-nav-toggle')) return setParams({ pnav: params.get('pnav') === 'closed' ? '' : 'closed' });
