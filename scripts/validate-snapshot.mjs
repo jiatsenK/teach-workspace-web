@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 const file = process.argv[2];
 if (!file) throw new Error('Usage: node validate-snapshot.mjs <snapshot.json>');
 const snapshot = JSON.parse(await fs.readFile(file, 'utf8'));
-const topKeys = new Set(['schemaVersion', 'generatedAt', 'learning', 'monthly']);
+const topKeys = new Set(['schemaVersion', 'generatedAt', 'publication', 'learning', 'monthly']);
 const learningKeys = new Set(['courses', 'courseOrder', 'hierarchy', 'weekDays', 'updatedAt']);
 const courseKeys = new Set(['id', 'key', 'name', 'short', 'kind', 'progressModel', 'resume', 'next', 'priority', 'progress', 'evidence', 'sessions', 'historySessions', 'reviewQueue']);
 const hierarchyKeys = new Set(['subjects', 'courses']);
@@ -25,6 +25,18 @@ function validateContent(items, path) { for (const item of items || []) { assert
 function validateVocabulary(items, path) { for (const item of items || []) { assertKeys(item, vocabularyKeys, `${path}[]`); assert(memoryStatuses.has(item.memoryStatus), `Invalid memory status ${path}.${item.id}`); assertPublicText(item.word, 120, `${path}.word`); assertPublicText(item.meaning, 240, `${path}.meaning`); assertPublicText(item.form, 240, `${path}.form`); } }
 assert(snapshot.schemaVersion === 3, 'Unexpected snapshot schemaVersion');
 assertKeys(snapshot, topKeys, '$'); assertKeys(snapshot.learning, learningKeys, '$.learning');
+if (snapshot.publication !== undefined) {
+  assertKeys(snapshot.publication, new Set(['configVersion', 'projectedAt', 'courses']), '$.publication');
+  for (const [courseId, course] of Object.entries(snapshot.publication.courses || {})) {
+    assertKeys(course, new Set(['visible', 'shape', 'sections']), `$.publication.courses.${courseId}`);
+    for (const [sectionId, section] of Object.entries(course.sections || {})) {
+      assertKeys(section, new Set(['visible', 'available', 'published']), `$.publication.courses.${courseId}.sections.${sectionId}`);
+      assert(Number.isInteger(section.available) && section.available >= 0, `Invalid available count for ${courseId}.${sectionId}`);
+      assert(Number.isInteger(section.published) && section.published >= 0, `Invalid published count for ${courseId}.${sectionId}`);
+      if (!section.visible) assert(section.published === 0, `Hidden section published data for ${courseId}.${sectionId}`);
+    }
+  }
+}
 const courses = snapshot.learning.courses || {};
 for (const [id, course] of Object.entries(courses)) { assertKeys(course, courseKeys, `$.learning.courses.${id}`); for (const item of course.evidence || []) { assert(['ok', 'warn'].includes(item.status), `Invalid evidence status for ${id}`); assert(/^\d+ 項(?:穩定學習證據|持續觀察)$|^目前無需/.test(item.text), `Detailed evidence leaked for ${id}`); } for (const collection of ['sessions', 'historySessions']) { for (const session of course[collection] || []) { validateContent(session.content, `${id}.${collection}.${session.sessionId || '?'}.content`); validateVocabulary(session.vocabulary, `${id}.${collection}.${session.sessionId || '?'}.vocabulary`); } } }
 const hierarchy = snapshot.learning.hierarchy || {}; assertKeys(hierarchy, hierarchyKeys, '$.learning.hierarchy');

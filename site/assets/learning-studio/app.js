@@ -1,7 +1,71 @@
+import { createLearningDataProvider } from '../data-provider.js';
+
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
 
 const params = new URLSearchParams(location.search);
-const state = { learning: null, monthly: null };
+const publishedPlatformConfig = JSON.parse(document.getElementById('learning-platform-config')?.textContent || '{"version":0,"courses":[]}');
+let platformConfig = publishedPlatformConfig;
+if (params.get('preview') === 'draft') {
+  try {
+    const draft = JSON.parse(localStorage.getItem('learning-platform.admin-draft.v1') || 'null');
+    if (draft?.courses) platformConfig = draft;
+  } catch {}
+}
+const visibleCourseConfigs = (platformConfig.courses || [])
+  .filter((course) => course.visible)
+  .sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+const courseConfigMap = Object.fromEntries(visibleCourseConfigs.map((course) => [course.id, course]));
+
+function visibleSection(courseId, sectionId) {
+  return (courseConfigMap[courseId]?.sections || []).some((section) => section.id === sectionId && section.visible);
+}
+
+function configuredLearning(learning) {
+  const hierarchy = learning?.hierarchy || {};
+  const sourceCourses = Object.fromEntries((hierarchy.courses || []).map((course) => [course.id, course]));
+  const sourcePayloads = learning?.courses || {};
+  const courses = visibleCourseConfigs.map((config) => ({
+    ...(sourceCourses[config.id] || {
+      id: config.id,
+      subjectId: config.subjectId,
+      status: 'active',
+      progress: { completed: 0, total: 0, currentUnitId: null },
+      units: [],
+      vocabulary: null,
+      courseContent: [],
+      courseVocabulary: [],
+    }),
+    name: config.courseLabel,
+    short: config.shortLabel,
+    courseType: config.shape,
+  }));
+  const subjectMap = new Map();
+  visibleCourseConfigs.forEach((config) => {
+    if (!subjectMap.has(config.subjectId)) {
+      subjectMap.set(config.subjectId, {
+        id: config.subjectId,
+        name: config.subjectLabel,
+        order: config.order,
+        currentCourseIds: [],
+        historyCourseIds: [],
+      });
+    }
+    subjectMap.get(config.subjectId).currentCourseIds.push(config.id);
+  });
+  const subjects = [...subjectMap.values()];
+  return {
+    ...(learning || {}),
+    courses: Object.fromEntries(visibleCourseConfigs.filter((config) => sourcePayloads[config.id]).map((config) => [config.id, sourcePayloads[config.id]])),
+    courseOrder: visibleCourseConfigs.map((config) => config.id),
+    hierarchy: { subjects, courses },
+  };
+}
+
+const state = {
+  learning: configuredLearning(null),
+  monthly: null,
+  dataStatus: { source: 'shell', hasData: false, refreshing: true, attempts: {} },
+};
 
 function allCourseIds(subject) {
   return [...(subject?.currentCourseIds || []), ...(subject?.historyCourseIds || [])];
@@ -33,6 +97,13 @@ function setParams(changes) {
   render();
 }
 
+function freshnessLabel() {
+  if (state.dataStatus.source === 'live') return '學習資料已更新';
+  if (state.dataStatus.source === 'published') return state.dataStatus.refreshing ? '已載入發布資料 · 背景更新中' : '目前使用發布資料';
+  if (state.dataStatus.source === 'cache') return state.dataStatus.refreshing ? '已載入最近資料 · 背景更新中' : '目前使用最近資料';
+  return state.dataStatus.refreshing ? '學習資料背景更新中' : '學習內容暫時無法更新';
+}
+
 function topbar(section) {
   return `<header class="b2-topbar">
     <button type="button" class="b2-brand" data-proto-home aria-label="回到學習首頁"><span class="b-character" aria-hidden="true"><i></i></span><strong>我的學習</strong></button>
@@ -40,6 +111,8 @@ function topbar(section) {
       <button type="button" data-proto-home class="${!section ? 'is-active' : ''}">首頁</button>
       <button type="button" data-proto-section="month" class="${section === 'month' ? 'is-active' : ''}">本月學習狀況</button>
     </nav>
+    <span class="b2-data-freshness" data-data-source="${esc(state.dataStatus.source)}">${esc(freshnessLabel())}</span>
+    <a class="b2-admin-link" href="./admin.html">管理</a>
   </header>`;
 }
 
@@ -145,20 +218,24 @@ function fixedUnitList(course, selectedUnitId) {
 
 function sessionList(coursePayload, hierarchyCourse, selectedLessonId, courseId) {
   const courseMaterials = (hierarchyCourse?.courseContent || []).length + (hierarchyCourse?.courseVocabulary || []).length;
-  const materialsLink = courseMaterials ? `<button type="button" data-proto-lesson="course-materials" data-proto-course="${esc(courseId)}" class="b2-lesson-link ${selectedLessonId === 'course-materials' ? 'is-active' : ''}"><span>＋</span><strong>課程整理</strong><small>${courseMaterials} 筆跨回合內容</small></button>` : '';
+  const materialsLink = courseMaterials && visibleSection(courseId, 'course-materials') ? `<button type="button" data-proto-lesson="course-materials" data-proto-course="${esc(courseId)}" class="b2-lesson-link ${selectedLessonId === 'course-materials' ? 'is-active' : ''}"><span>＋</span><strong>課程整理</strong><small>${courseMaterials} 筆跨回合內容</small></button>` : '';
   return materialsLink + (coursePayload?.historySessions || coursePayload?.sessions || []).map((session) => `<button type="button" data-proto-lesson="${esc(session.sessionId)}" data-proto-course="${esc(courseId)}" class="b2-lesson-link ${session.sessionId === selectedLessonId ? 'is-active' : ''}"><span>${esc((session.date || '').slice(5))}</span><strong>${esc(session.title || '未命名學習回合')}</strong><small>學習回合</small></button>`).join('');
 }
 
 function constructionBranches(mode, coursePayload, hierarchyCourse) {
-  const examCount = (coursePayload?.historySessions || []).length;
+  const sessionCount = (coursePayload?.historySessions || []).length;
   const topicCount = (hierarchyCourse?.units || []).length;
-  return `<div class="b2-branches"><p>可從考古題演練或主題學習進入。</p><button type="button" data-proto-mode="exam" class="${mode === 'exam' ? 'is-active' : ''}"><strong>考古題演練</strong><span>${examCount} 個學習回合</span></button><button type="button" data-proto-mode="topic" class="${mode === 'topic' ? 'is-active' : ''}"><strong>主題學習</strong><span>${topicCount} 個主題</span></button></div>`;
+  const courseId = hierarchyCourse?.id || 'construction';
+  const sessions = visibleSection(courseId, 'sessions') ? `<button type="button" data-proto-mode="sessions" class="${mode === 'sessions' ? 'is-active' : ''}"><strong>考古題學習回合</strong><span>${sessionCount} 個學習回合</span></button>` : '';
+  const topics = visibleSection(courseId, 'topics') ? `<button type="button" data-proto-mode="topics" class="${mode === 'topics' ? 'is-active' : ''}"><strong>主題學習</strong><span>${topicCount} 個主題</span></button>` : '';
+  return `<div class="b2-branches"><p>依目前公開設定選擇學習入口。</p>${sessions}${topics}</div>`;
 }
 
 function rail(data) {
   const { subjects, courseMap, selectedSubject, selectedCourse, selectedCoursePayload, selectedUnit, selectedLessonId, mode, closed } = data;
   const courses = allCourseIds(selectedSubject).map((id) => courseMap[id]).filter(Boolean);
-  const useSessions = selectedSubject?.id === 'japanese' || (selectedSubject?.id === 'construction' && mode === 'exam');
+  const shape = courseConfigMap[selectedCourse?.id]?.shape;
+  const useSessions = shape === 'session-topic' || (shape === 'question-bank-hybrid' && mode === 'sessions');
   const lessonList = useSessions ? sessionList(selectedCoursePayload, selectedCourse, selectedLessonId, selectedCourse?.id) : fixedUnitList(selectedCourse, selectedUnit?.id);
   return `<aside class="b2-rail ${closed ? 'is-closed' : ''}"><div class="b2-rail__head"><button type="button" data-proto-nav-toggle aria-label="${closed ? '展開課程目錄' : '收起課程目錄'}">${closed ? '展開目錄' : '收起目錄'}</button><div><span>${esc(selectedSubject?.name || '')}</span><strong>${esc(selectedCourse?.name || '')}</strong></div></div><div class="b2-rail__body"><div class="b2-subject-shortcuts">${subjects.map((subject) => `<button type="button" data-proto-subject="${esc(subject.id)}" class="${subject.id === selectedSubject?.id ? 'is-active' : ''}">${esc(subject.name)}</button>`).join('')}</div>${courses.length > 1 ? `<div class="b2-course-list">${courses.map((course) => `<button type="button" data-proto-course="${esc(course.id)}" class="${course.id === selectedCourse?.id ? 'is-active' : ''}">${esc(course.name)}</button>`).join('')}</div>` : ''}${selectedSubject?.id === 'construction' ? constructionBranches(mode, selectedCoursePayload, selectedCourse) : ''}<div class="b2-lesson-list">${lessonList || '<p class="proto-empty">目前沒有可列出的課次。</p>'}</div></div></aside>`;
 }
@@ -167,7 +244,7 @@ function unitReader(unit) {
   if (!unit) return '<div class="b2-empty-reader"><strong>選一課開始閱讀。</strong><span>課文會固定出現在這個區域，不會跑到清單最下面。</span></div>';
   const content = unit.content || [];
   const vocabulary = unit.vocabulary || [];
-  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>第 ${Number(unit.number || 0)} 課</span><span>${esc(unit.sourceRange || '目前未標示教材範圍')}</span></div><h1>${esc(unit.name || '未命名課次')}</h1>${(unit.outline || []).length ? `<section class="b2-lede"><h2>這一課要學什麼</h2><ul>${unit.outline.map((item) => `<li>${esc(item)}</li>`).join('')}</ul></section>` : ''}<div class="b2-content-blocks">${content.length ? content.map((item) => `<section><span>${esc(item.type || '教材內容')}</span><h2>${esc(item.label || '本課重點')}</h2><p>${esc(item.explanation || '')}</p>${item.sourceRange ? `<small>來源：${esc(item.sourceRange)}</small>` : ''}</section>`).join('') : '<section class="b2-data-note"><strong>這一課目前尚未發布教材內容。</strong><p>內容更新後會顯示在這裡。</p></section>'}</div>${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>學習狀態：${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}</article>`;
+  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>第 ${Number(unit.number || 0)} 課</span><span>${esc(unit.sourceRange || '目前未標示教材範圍')}</span></div><h1>${esc(unit.name || '未命名課次')}</h1>${(unit.outline || []).length ? `<section class="b2-lede"><h2>這一課要學什麼</h2><ul>${unit.outline.map((item) => `<li>${esc(item)}</li>`).join('')}</ul></section>` : ''}<div class="b2-content-blocks">${content.length ? content.map((item) => `<section data-content-id="${esc(item.id || '')}"><span>${esc(item.type || '教材內容')}</span><h2>${esc(item.label || '本課重點')}</h2><p>${esc(item.explanation || '')}</p>${item.sourceRange ? `<small>來源：${esc(item.sourceRange)}</small>` : ''}</section>`).join('') : '<section class="b2-data-note"><strong>這一課目前尚未發布教材內容。</strong><p>內容更新後會顯示在這裡。</p></section>'}</div>${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>學習狀態：${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}</article>`;
 }
 
 function courseMaterialsReader(course) {
@@ -176,19 +253,20 @@ function courseMaterialsReader(course) {
   return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>課程整理</span><span>跨回合整理</span></div><h1>跨回合教材與表達</h1><section class="b2-lede"><h2>為什麼放在這裡</h2><p>這些內容沒有可確認的單一學習回合，因此集中顯示在這裡。</p></section><div class="b2-content-blocks">${content.map((item) => `<section><span>${esc(item.type || '教材內容')}</span><h2>${esc(item.label || '課程重點')}</h2><p>${esc(item.explanation || '')}</p></section>`).join('')}</div>${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>學習狀態：${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}</article>`;
 }
 
-function sessionReader(session, coursePayload, subjectId) {
+function sessionReader(session, coursePayload, courseId) {
   if (!session) return '<div class="b2-empty-reader"><strong>目前沒有可顯示的學習回合。</strong></div>';
-  const isJapanese = subjectId === 'japanese';
+  const config = courseConfigMap[courseId] || {};
+  const isJapanese = config.subjectId === 'japanese';
+  const isConstruction = config.shape === 'question-bank-hybrid';
   const content = Array.isArray(session.content) ? session.content : [];
   const vocabulary = Array.isArray(session.vocabulary) ? session.vocabulary : [];
-  const japaneseLearningContent = `<div class="b2-content-blocks">${content.length
-    ? content.map((item) => `<section><span>${esc(item.type || '學習內容')}</span><h2>${esc(item.label || '本次重點')}</h2><p>${esc(item.explanation || '')}</p></section>`).join('')
-    : '<section class="b2-data-note"><strong>這次學習回合目前沒有已整理的學習內容。</strong><p>整理完成的文法、自然表達與搭配會直接顯示在這裡。</p></section>'}</div>
+  const sessionLearningContent = `<div class="b2-content-blocks">${content.length
+    ? content.map((item) => `<section data-content-id="${esc(item.id || '')}"><span>${esc(item.type || '學習內容')}</span><h2>${esc(item.label || '本次重點')}</h2><p>${esc(item.explanation || '')}</p></section>`).join('')
+    : `<section class="b2-data-note"><strong>這次學習回合目前沒有已整理的學習內容。</strong><p>${isJapanese ? '整理完成的文法、自然表達與搭配會直接顯示在這裡。' : '可先依本次範圍與下次接續繼續學習。'}</p></section>`}</div>
     ${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>學習狀態：${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}`;
-  const sessionNote = isJapanese
-    ? japaneseLearningContent
-    : '<section class="b2-data-note"><strong>這是考古題學習紀錄摘要。</strong><p>完整題目與答案目前尚未提供。</p></section>';
-  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>${isJapanese ? '日文學習回合' : '考古題回合'}</span><span>${esc(session.date || '')}</span></div><h1>${esc(session.title || '未命名學習回合')}</h1><section class="b2-lede"><h2>本次學習範圍</h2><p>${esc(session.learningScope || session.title || '目前沒有範圍摘要')}</p></section>${sessionNote}<section class="b2-review-note"><h2>下次接續</h2><p>${esc(session.reviewNeeded || coursePayload?.next || '目前沒有待接續項目')}</p></section></article>`;
+  const summary = isConstruction && session.completedSummary ? `<section class="b2-lede"><h2>本次完成</h2><p>${esc(session.completedSummary)}</p></section>` : '';
+  const typeLabel = isJapanese ? '日文學習回合' : isConstruction ? '考古題學習回合' : 'Free Talk 學習回合';
+  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>${typeLabel}</span><span>${esc(session.date || '')}</span></div><h1>${esc(session.title || '未命名學習回合')}</h1><section class="b2-lede"><h2>本次學習範圍</h2><p>${esc(session.learningScope || session.title || '目前沒有範圍摘要')}</p></section>${summary}${sessionLearningContent}<section class="b2-review-note"><h2>下次接續</h2><p>${esc(session.nextStart || session.reviewNeeded || coursePayload?.next || '目前沒有待接續項目')}</p></section></article>`;
 }
 
 function footprintView(coursePayload) {
@@ -199,16 +277,21 @@ function footprintView(coursePayload) {
 function learningView(data) {
   const section = params.get('psection') || 'learn';
   const closed = params.get('pnav') === 'closed';
-  const mode = data.selectedSubject?.id === 'construction' ? (params.get('pmode') || 'exam') : '';
+  const shape = courseConfigMap[data.selectedCourse?.id]?.shape;
+  const requestedMode = params.get('pmode');
+  const mode = shape === 'question-bank-hybrid' ? (requestedMode === 'topics' || requestedMode === 'topic' ? 'topics' : 'sessions') : '';
   const sessions = data.selectedCoursePayload?.historySessions || data.selectedCoursePayload?.sessions || [];
-  const hasCourseMaterials = (data.selectedCourse?.courseContent || []).length + (data.selectedCourse?.courseVocabulary || []).length > 0;
+  const hasCourseMaterials = visibleSection(data.selectedCourse?.id, 'course-materials') && (data.selectedCourse?.courseContent || []).length + (data.selectedCourse?.courseVocabulary || []).length > 0;
   const selectedLessonId = params.get('plesson') || (hasCourseMaterials ? 'course-materials' : sessions[0]?.sessionId) || '';
   const selectedSession = sessions.find((item) => item.sessionId === selectedLessonId) || sessions[0];
-  const useSessions = data.selectedSubject?.id === 'japanese' || (data.selectedSubject?.id === 'construction' && mode === 'exam');
-  const content = section === 'history'
+  const useSessions = shape === 'session-topic' || (shape === 'question-bank-hybrid' && mode === 'sessions');
+  const waitingForCourseData = !data.selectedCoursePayload && !(data.selectedCourse?.units || []).length;
+  const content = waitingForCourseData
+    ? '<div class="b2-empty-reader" role="status"><strong>這門課的內容正在背景更新。</strong><span>首頁與課程入口仍可正常使用。</span></div>'
+    : section === 'history'
     ? footprintView(data.selectedCoursePayload)
     : useSessions
-      ? selectedLessonId === 'course-materials' ? courseMaterialsReader(data.selectedCourse) : sessionReader(selectedSession, data.selectedCoursePayload, data.selectedSubject?.id)
+      ? selectedLessonId === 'course-materials' ? courseMaterialsReader(data.selectedCourse) : sessionReader(selectedSession, data.selectedCoursePayload, data.selectedCourse?.id)
       : unitReader(data.selectedUnit);
   return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${rail({ ...data, selectedLessonId, mode, closed })}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-nav-jump>查看目錄</button><button type="button" data-proto-section="learn" class="${section === 'learn' ? 'is-active' : ''}">讀課文</button><button type="button" data-proto-section="history" class="${section === 'history' ? 'is-active' : ''}">看學習足跡</button><small>${section === 'history' ? '查看這門課最近學過什麼' : '一次只看一課'}</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
 }
@@ -235,16 +318,15 @@ document.addEventListener('click', (event) => {
   if (target.dataset.protoCourse) return setParams({ pcourse:target.dataset.protoCourse, punit:'', plesson:'', pmode:'', psection:'learn' });
 });
 
-function scriptCall(method) {
-  return new Promise((resolve, reject) => google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[method]());
-}
+render();
 
-(async () => {
-  document.getElementById('app').innerHTML = '<div style="padding:2rem">正在讀取學習資料…</div>';
-  try {
-    [state.learning, state.monthly] = await Promise.all([scriptCall('getLearningWorkspaceData'), scriptCall('getMonthlyLearningStatus')]);
-    render();
-  } catch (error) {
-    document.getElementById('app').innerHTML = `<div style="padding:2rem">讀取失敗：${esc(error?.message || error)}</div>`;
+const provider = createLearningDataProvider();
+provider.subscribe(({ snapshot, status }) => {
+  state.dataStatus = status;
+  if (snapshot) {
+    state.learning = configuredLearning(snapshot.learning);
+    state.monthly = snapshot.monthly;
   }
-})();
+  render();
+});
+provider.start();
