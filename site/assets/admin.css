@@ -141,6 +141,27 @@ a { color: inherit; }
 .admin-button[data-state='error'] { border-color: var(--color-error); }
 .admin-button[data-state='success']::before { content: '✓'; }
 .admin-toolbar > p { max-width: 68ch; margin: 0; font-size: var(--text-sm); }
+.admin-release-config {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding-block: var(--space-lg);
+  border-block: var(--rule-hair) dashed var(--color-rule-2);
+}
+.admin-release-config label { display: grid; gap: var(--space-xs); color: var(--color-muted); font-size: var(--text-sm); }
+.admin-release-config input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding-inline: var(--space-sm);
+  border: var(--rule-hair) solid var(--color-rule-2);
+  border-radius: var(--radius-tight);
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+.admin-release-config p { grid-column: 1 / -1; margin: 0; color: var(--color-muted); font-size: var(--text-sm); }
+.admin-release-config p[data-tone='error'] { color: var(--color-error); }
+.admin-release-config p[data-tone='ready'] { color: var(--color-success); }
 
 .admin-courses { display: grid; gap: var(--space-xl); }
 .admin-course {
@@ -312,6 +333,7 @@ a { color: inherit; }
   .admin-toolbar { grid-template-columns: minmax(14rem, 0.6fr) minmax(0, 1.4fr); align-items: center; }
   .admin-actions { justify-content: flex-end; }
   .admin-toolbar > p { grid-column: 1 / -1; }
+  .admin-release-config { grid-template-columns: minmax(14rem, 1fr) auto; align-items: end; }
   .admin-course__body { grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); }
   .admin-course__head { flex-direction: row; }
   .admin-course-fields { grid-template-columns: minmax(12rem, 0.8fr) minmax(0, 1.5fr) minmax(7rem, 0.5fr); align-items: end; }

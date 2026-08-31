@@ -1,6 +1,8 @@
 import { createLearningDataProvider } from './data-provider.js';
+import { publishLearningPlatformConfig, readLearningWriteStatus } from './learning-studio/config-client.js';
 
 const DRAFT_KEY = 'learning-platform.admin-draft.v1';
+const WRITE_KEY = 'learning-platform.note-write-key';
 const root = document.getElementById('admin');
 const published = JSON.parse(document.getElementById('learning-platform-config')?.textContent || '{"version":0,"courses":[]}');
 const RECORD_FIELDS = Object.freeze([
@@ -13,6 +15,7 @@ const RECORD_FIELDS = Object.freeze([
 ]);
 let draft = loadDraft() || structuredClone(published);
 let dataState = { snapshot: null, status: { source: 'shell', attempts: {} } };
+let writeState = { state: 'loading', capabilities: null, message: '正在確認 production 寫入設定…', publication: null };
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
@@ -150,6 +153,11 @@ function render() {
   const hasOperations = runtimes.some((runtime) => Boolean(runtime.operations));
   const completeCount = runtimes.filter((runtime) => runtime.health?.latestSession?.complete === true).length;
   const projectedVersion = Number(dataState.snapshot?.publication?.configVersion || 0);
+  const publishing = writeState.state === 'publishing';
+  const publishDisabled = !isDirty() || publishing;
+  const capabilityLabel = writeState.capabilities
+    ? `${writeState.capabilities.noteWriteEnabled ? '管理金鑰已設定' : '管理金鑰未設定'} · ${writeState.capabilities.configPublishEnabled ? 'GitHub 發布已設定' : 'GitHub 發布未設定'}`
+    : writeState.message;
   root.innerHTML = `<div class="admin-shell">
     <nav class="admin-nav" aria-label="管理頁導航"><a class="admin-wordmark" href="./admin.html">Learning Platform</a><a class="admin-back" href="./">回前台</a></nav>
     <header class="admin-overview">
@@ -164,8 +172,13 @@ function render() {
     </section>
     <section class="admin-toolbar">
       <div class="admin-publish" data-tone="${isDirty() ? 'attention' : 'ready'}"><i aria-hidden="true"></i><div><strong>${isDirty() ? '有未發布草稿' : '設定已同步'}</strong><span>正式設定版本 ${Number(published.version || 0)}</span></div></div>
-      <div class="admin-actions"><button class="admin-button admin-button--secondary" type="button" data-admin-preview>預覽草稿</button><button class="admin-button admin-button--primary" type="button" data-admin-download>下載設定</button><button class="admin-button admin-button--quiet" type="button" data-admin-reset>捨棄草稿</button></div>
-      <p>下載後仍須在 canonical repo 驗證、commit、部署；此公開管理頁不持有試算表權限或憑證。</p>
+      <div class="admin-actions"><button class="admin-button admin-button--secondary" type="button" data-admin-preview>預覽草稿</button><button class="admin-button admin-button--secondary" type="button" data-admin-download>下載設定</button><button class="admin-button admin-button--quiet" type="button" data-admin-reset>捨棄草稿</button></div>
+      <div class="admin-release-config">
+        <label><span>管理金鑰</span><input type="password" data-admin-key autocomplete="current-password" placeholder="${sessionStorage.getItem(WRITE_KEY) ? '已保留於本分頁' : '至少 4 個字元'}"></label>
+        <button class="admin-button admin-button--primary" type="button" data-admin-publish ${publishDisabled ? 'disabled' : ''} data-state="${esc(writeState.state)}">${publishing ? '提交中…' : '發布正式設定'}</button>
+        <p data-tone="${writeState.state === 'error' ? 'error' : writeState.state === 'success' ? 'ready' : 'waiting'}">${esc(capabilityLabel)}${writeState.publication ? ` · commit ${esc(String(writeState.publication.commitSha || '').slice(0, 7))}，Actions 正在部署版本 ${Number(writeState.publication.configVersion || 0)}` : ''}</p>
+      </div>
+      <p>發布會把允許的顯示設定提交到 canonical repo，再由既有 Actions 更新 GAS 與 Pages。金鑰只保留於本次分頁，不會寫入公開檔案。</p>
     </section>
     <main class="admin-courses">${courses.map(renderCourse).join('')}</main>
     <footer class="admin-footer"><span>Learning Platform 管理</span><span>canonical：teach-workspace</span><span>learner-facing mirror：teach-workspace-web</span></footer>
@@ -173,6 +186,11 @@ function render() {
 }
 
 root.addEventListener('input', (event) => {
+  if (event.target.matches('[data-admin-key]')) {
+    if (event.target.value) sessionStorage.setItem(WRITE_KEY, event.target.value);
+    else sessionStorage.removeItem(WRITE_KEY);
+    return;
+  }
   const courseElement = event.target.closest('[data-course-index]');
   if (!courseElement) return;
   const course = draft.courses[Number(courseElement.dataset.courseIndex)];
@@ -185,7 +203,7 @@ root.addEventListener('input', (event) => {
   updateDraftStatus();
 });
 
-root.addEventListener('click', (event) => {
+root.addEventListener('click', async (event) => {
   if (event.target.closest('[data-admin-preview]')) window.open('./?preview=draft', '_blank', 'noopener');
   if (event.target.closest('[data-admin-reset]')) { localStorage.removeItem(DRAFT_KEY); draft = structuredClone(published); render(); }
   if (event.target.closest('[data-admin-download]')) {
@@ -196,9 +214,25 @@ root.addEventListener('click', (event) => {
     link.click();
     URL.revokeObjectURL(link.href);
   }
+  if (event.target.closest('[data-admin-publish]')) {
+    const writeKey = root.querySelector('[data-admin-key]')?.value || sessionStorage.getItem(WRITE_KEY) || '';
+    writeState = { ...writeState, state: 'publishing', message: '正在提交 canonical 設定…', publication: null };
+    render();
+    try {
+      const publication = await publishLearningPlatformConfig({ writeKey, config: draft });
+      sessionStorage.setItem(WRITE_KEY, writeKey);
+      writeState = { ...writeState, state: 'success', message: 'canonical 已提交，等待自動部署。', publication };
+    } catch (error) {
+      writeState = { ...writeState, state: 'error', message: String(error?.message || error), publication: null };
+    }
+    render();
+  }
 });
 
 render();
 const provider = createLearningDataProvider();
 provider.subscribe((next) => { dataState = next; render(); });
 provider.start();
+readLearningWriteStatus()
+  .then((capabilities) => { writeState = { ...writeState, state: 'ready', capabilities, message: '' }; render(); })
+  .catch((error) => { writeState = { ...writeState, state: 'error', message: String(error?.message || error) }; render(); });
