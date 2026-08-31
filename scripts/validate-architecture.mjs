@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const pagesDir = path.dirname(fileURLToPath(import.meta.url));
 const sourceDir = process.argv[2] ? path.resolve(process.argv[2]) : path.join(pagesDir, 'src');
 const activeEntrypoints = Object.freeze(['learning-studio/app.js', 'admin.js']);
-const activeModules = new Set([...activeEntrypoints, 'data-provider.js']);
+const activeModules = new Set([...activeEntrypoints, 'data-provider.js', 'learning-studio/course-context.js', 'learning-studio/note-client.js']);
 
 async function importsFor(relativePath) {
   const source = await fs.readFile(path.join(sourceDir, relativePath), 'utf8');

@@ -67,6 +67,43 @@
   overflow: hidden;
 }
 
+.b2-month-footprints {
+  display: grid;
+  max-width: 58rem;
+  margin-inline: auto;
+  border-top: var(--rule-hair) solid var(--color-rule);
+}
+
+.b2-month-footprints > section {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: var(--space-lg);
+  padding: var(--space-lg) 0;
+  border-bottom: var(--rule-hair) solid var(--color-rule);
+}
+
+.b2-month-footprints time {
+  color: var(--color-muted);
+  font-family: var(--font-b-mono);
+  font-size: var(--text-sm);
+}
+
+.b2-month-footprints article + article {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: var(--rule-hair) dashed var(--color-rule);
+}
+
+.b2-month-footprints h2 {
+  margin: var(--space-2xs) 0;
+  font-size: var(--text-md);
+}
+
+.b2-month-footprints p {
+  margin: 0;
+  color: var(--color-ink-2);
+}
+
 .b2-month-summary {
   display: grid;
   align-content: start;
@@ -267,6 +304,11 @@
 
   .b2-month-visual {
     min-height: 28rem;
+  }
+
+  .b2-month-footprints > section {
+    grid-template-columns: 1fr;
+    gap: var(--space-xs);
   }
 
   .b2-course-bar {
