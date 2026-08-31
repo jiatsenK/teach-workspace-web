@@ -264,14 +264,28 @@ function sessionReader(session, coursePayload, courseId) {
     ? content.map((item) => `<section data-content-id="${esc(item.id || '')}"><span>${esc(item.type || '學習內容')}</span><h2>${esc(item.label || '本次重點')}</h2><p>${esc(item.explanation || '')}</p></section>`).join('')
     : `<section class="b2-data-note"><strong>這次學習回合目前沒有已整理的學習內容。</strong><p>${isJapanese ? '整理完成的文法、自然表達與搭配會直接顯示在這裡。' : '可先依本次範圍與下次接續繼續學習。'}</p></section>`}</div>
     ${vocabulary.length ? `<section class="b2-vocab"><h2>單字與表達</h2>${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>學習狀態：${esc(item.memoryStatus || '未開始')}</small></div>`).join('')}</section>` : ''}`;
-  const summary = isConstruction && session.completedSummary ? `<section class="b2-lede"><h2>本次完成</h2><p>${esc(session.completedSummary)}</p></section>` : '';
+  const summary = session.completedSummary ? `<section class="b2-lede"><h2>本次完成</h2><p>${esc(session.completedSummary)}</p></section>` : '';
+  const performance = session.learnerPerformance ? `<section class="b2-review-note"><h2>我的練習與表現</h2><p>${esc(session.learnerPerformance)}</p></section>` : '';
+  const adjustments = session.learningAdjustments ? `<section class="b2-review-note"><h2>卡住與修正</h2><p>${esc(session.learningAdjustments)}</p></section>` : '';
+  const review = session.reviewNeeded ? `<section class="b2-review-note"><h2>這次要複習</h2><p>${esc(session.reviewNeeded)}</p></section>` : '';
   const typeLabel = isJapanese ? '日文學習回合' : isConstruction ? '考古題學習回合' : 'Free Talk 學習回合';
-  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>${typeLabel}</span><span>${esc(session.date || '')}</span></div><h1>${esc(session.title || '未命名學習回合')}</h1><section class="b2-lede"><h2>本次學習範圍</h2><p>${esc(session.learningScope || session.title || '目前沒有範圍摘要')}</p></section>${summary}${sessionLearningContent}<section class="b2-review-note"><h2>下次接續</h2><p>${esc(session.nextStart || session.reviewNeeded || coursePayload?.next || '目前沒有待接續項目')}</p></section></article>`;
+  return `<article class="b2-reading-page"><div class="b2-reading-meta"><span>${typeLabel}</span><span>${esc(session.date || '')}</span></div><h1>${esc(session.title || '未命名學習回合')}</h1><section class="b2-lede"><h2>本次學習範圍</h2><p>${esc(session.learningScope || session.title || '目前沒有範圍摘要')}</p></section>${summary}${performance}${adjustments}${sessionLearningContent}${review}<section class="b2-review-note"><h2>下次接續</h2><p>${esc(session.nextStart || session.reviewNeeded || coursePayload?.next || '目前沒有待接續項目')}</p></section></article>`;
 }
 
 function footprintView(coursePayload) {
   const sessions = coursePayload?.historySessions || coursePayload?.sessions || [];
   return `<article class="b2-reading-page b2-footprint"><div class="b2-reading-meta"><span>學習足跡</span><span>${sessions.length} 個已記錄回合</span></div><h1>最近學過什麼</h1><p class="b2-helper">這裡只整理已正式記錄的學習回合，不會修改進度或教材。</p><div class="b2-footprint-list">${sessions.length ? sessions.map((session) => `<section><time>${esc(session.date || '')}</time><div><h2>${esc(session.title || '未命名回合')}</h2><p>${esc(session.learningScope || '')}</p>${session.reviewNeeded ? `<small>待接續：${esc(session.reviewNeeded)}</small>` : ''}</div></section>`).join('') : '<div class="b2-data-note"><strong>目前沒有學習足跡。</strong><p>有新的學習紀錄後會顯示在這裡。</p></div>'}</div></article>`;
+}
+
+function reviewView(coursePayload) {
+  const review = coursePayload?.review || {};
+  const queue = review.queue || coursePayload?.reviewQueue || [];
+  const notes = review.notes || [];
+  const anki = review.anki || [];
+  return `<article class="b2-reading-page b2-review-center"><div class="b2-reading-meta"><span>課程複習</span><span>${queue.length + notes.length + anki.length} 筆可用內容</span></div><h1>回來複習這門課</h1><p class="b2-helper">只顯示後台已明確設定公開的複習內容；題庫或 Anki 有資料不代表會自動公開。</p>
+    <section class="b2-review-group"><h2>待複習</h2>${queue.length ? `<div class="b2-review-list">${queue.map((item) => `<article><span>${esc(item.type || item.status || '複習')}</span><p>${esc(item.text || '')}</p>${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</article>`).join('')}</div>` : '<div class="b2-data-note"><strong>目前沒有待複習項目。</strong><p>完成課程並記錄後，適合回顧的內容會出現在這裡。</p></div>'}</section>
+    <section class="b2-review-group"><h2>我的筆記</h2>${notes.length ? `<div class="b2-note-list">${notes.map((note) => `<article><span>${esc(note.updatedAt || '')}</span><h3>${esc(note.title || '未命名筆記')}</h3><p>${esc(note.text || '')}</p>${note.mnemonic ? `<small>記憶口訣：${esc(note.mnemonic)}</small>` : ''}</article>`).join('')}</div>` : '<div class="b2-data-note"><strong>目前沒有已公開的筆記。</strong><p>可在課程試算表的「學習筆記」新增自由筆記，再決定是否顯示於網站。</p></div>'}</section>
+    ${anki.length ? `<section class="b2-review-group"><h2>Anki 卡片</h2><div class="b2-anki-list">${anki.map((card) => `<details><summary>${esc(card.prompt || '')}</summary><p>${esc(card.response || '')}</p>${card.tags ? `<small>${esc(card.tags)}</small>` : ''}</details>`).join('')}</div></section>` : ''}</article>`;
 }
 
 function learningView(data) {
@@ -290,10 +304,15 @@ function learningView(data) {
     ? '<div class="b2-empty-reader" role="status"><strong>這門課的內容正在背景更新。</strong><span>首頁與課程入口仍可正常使用。</span></div>'
     : section === 'history'
     ? footprintView(data.selectedCoursePayload)
+    : section === 'review'
+    ? reviewView(data.selectedCoursePayload)
     : useSessions
       ? selectedLessonId === 'course-materials' ? courseMaterialsReader(data.selectedCourse) : sessionReader(selectedSession, data.selectedCoursePayload, data.selectedCourse?.id)
       : unitReader(data.selectedUnit);
-  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${rail({ ...data, selectedLessonId, mode, closed })}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-nav-jump>查看目錄</button><button type="button" data-proto-section="learn" class="${section === 'learn' ? 'is-active' : ''}">讀課文</button><button type="button" data-proto-section="history" class="${section === 'history' ? 'is-active' : ''}">看學習足跡</button><small>${section === 'history' ? '查看這門課最近學過什麼' : '一次只看一課'}</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
+  const reviewTab = visibleSection(data.selectedCourse?.id, 'review') || visibleSection(data.selectedCourse?.id, 'notes') || visibleSection(data.selectedCourse?.id, 'anki')
+    ? `<button type="button" data-proto-section="review" class="${section === 'review' ? 'is-active' : ''}">複習</button>` : '';
+  const helper = section === 'history' ? '查看這門課最近學過什麼' : section === 'review' ? '整理待複習、筆記與可用卡片' : '一次只看一課';
+  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${rail({ ...data, selectedLessonId, mode, closed })}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-nav-jump>查看目錄</button><button type="button" data-proto-section="learn" class="${section === 'learn' ? 'is-active' : ''}">讀課文</button><button type="button" data-proto-section="history" class="${section === 'history' ? 'is-active' : ''}">看學習足跡</button>${reviewTab}<small>${helper}</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
 }
 
 function render() {

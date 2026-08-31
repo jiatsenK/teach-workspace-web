@@ -3,7 +3,7 @@ export const PUBLISHED_DATA_URL = './data/snapshot.json';
 export const CACHE_KEY = 'learning-platform.snapshot.v1';
 
 export function isValidSnapshot(snapshot) {
-  return Boolean(snapshot && snapshot.schemaVersion === 3 && snapshot.learning && snapshot.monthly);
+  return Boolean(snapshot && [3, 4].includes(snapshot.schemaVersion) && snapshot.learning && snapshot.monthly);
 }
 
 function timestamp(snapshot) {

@@ -3,6 +3,14 @@ import { createLearningDataProvider } from './data-provider.js';
 const DRAFT_KEY = 'learning-platform.admin-draft.v1';
 const root = document.getElementById('admin');
 const published = JSON.parse(document.getElementById('learning-platform-config')?.textContent || '{"version":0,"courses":[]}');
+const RECORD_FIELDS = Object.freeze([
+  ['stableId', '穩定 ID'],
+  ['learningScope', '學習範圍'],
+  ['completedSummary', '完成內容'],
+  ['reviewSummary', '複習摘要'],
+  ['learnerPerformance', '學習者表現'],
+  ['nextStart', '下次開始'],
+]);
 let draft = loadDraft() || structuredClone(published);
 let dataState = { snapshot: null, status: { source: 'shell', attempts: {} } };
 
@@ -11,7 +19,12 @@ function esc(value) {
 }
 
 function loadDraft() {
-  try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; }
+  try {
+    const stored = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    return Number(stored?.version || 0) === Number(published.version || 0) ? stored : null;
+  } catch {
+    return null;
+  }
 }
 
 function saveDraft() {
@@ -25,40 +38,137 @@ function isDirty() {
 function updateDraftStatus() {
   const publish = root.querySelector('.admin-publish');
   if (!publish) return;
-  publish.classList.toggle('is-draft', isDirty());
-  publish.classList.toggle('is-published', !isDirty());
+  publish.dataset.tone = isDirty() ? 'attention' : 'ready';
   const label = publish.querySelector('strong');
-  if (label) label.textContent = isDirty() ? '有未發布草稿' : '與已發布設定一致';
+  if (label) label.textContent = isDirty() ? '有未發布草稿' : '設定已同步';
+}
+
+function formatDate(value, includeTime = false) {
+  if (!value) return '尚無時間';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.valueOf())) return String(value);
+  return new Intl.DateTimeFormat('zh-TW', includeTime
+    ? { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }
+    : { year: 'numeric', month: '2-digit', day: '2-digit' }).format(parsed);
 }
 
 function attemptLabel(attempt) {
-  if (!attempt) return '尚未開始';
-  if (attempt.state === 'ready') return `成功${attempt.generatedAt ? ` · ${attempt.generatedAt}` : ''}`;
-  if (attempt.state === 'failed') return `失敗 · ${attempt.message || 'unknown'}`;
-  if (attempt.state === 'loading') return '更新中';
-  return '無可用資料';
+  if (!attempt || attempt.state === 'pending') return '尚未開始';
+  if (attempt.state === 'ready') return `完成 · ${formatDate(attempt.generatedAt, true)}`;
+  if (attempt.state === 'failed') return `失敗 · ${attempt.message === 'timeout' ? '逾時，保留舊資料' : attempt.message || '未知原因'}`;
+  if (attempt.state === 'loading') return '背景更新中';
+  return '沒有可用資料';
 }
 
-function courseDiagnostics(course) {
-  const diagnostic = dataState.snapshot?.publication?.courses?.[course.id];
-  if (!diagnostic) return '<span class="admin-muted">目前 payload 沒有分層診斷；需等待新版 projection。</span>';
-  return (course.sections || []).map((section) => {
-    const item = diagnostic.sections?.[section.id] || {};
-    return `<span>${esc(section.label)}：來源 ${Number(item.available || 0)}／前台 ${Number(item.published || 0)}</span>`;
-  }).join('');
+function sourceLabel(source) {
+  return ({ shell: '網站外殼', cache: '瀏覽器舊資料', published: '已發布快照', live: 'GAS 背景更新' })[source] || source || '網站外殼';
+}
+
+function courseRuntime(course) {
+  const payload = dataState.snapshot?.learning?.courses?.[course.id] || null;
+  const publication = dataState.snapshot?.publication?.courses?.[course.id] || null;
+  const operations = payload?.operations || null;
+  return { payload, publication, operations, health: operations?.recordHealth || null, release: operations?.ankiRelease || null };
+}
+
+function recordTone(runtime) {
+  if (!runtime.payload) return ['waiting', '等待課程資料'];
+  if (!runtime.health) return ['waiting', '等待新版診斷'];
+  if (!runtime.health.latestSession) return ['attention', '尚無學習紀錄'];
+  return runtime.health.latestSession.complete ? ['ready', '最近紀錄完整'] : ['attention', '最近紀錄待補'];
+}
+
+function renderRecordFields(runtime) {
+  const latest = runtime.health?.latestSession;
+  if (!latest) return '<p class="admin-empty">新版 projection 上線後，這裡會檢查每一筆複習紀錄是否真的可用。</p>';
+  return `<ul class="admin-checks">${RECORD_FIELDS.map(([key, label]) => `<li data-ok="${latest.fields?.[key] === true}"><span aria-hidden="true"></span>${esc(label)}</li>`).join('')}</ul>`;
+}
+
+function renderPublication(course, runtime) {
+  if (!runtime.publication) return '<p class="admin-empty">尚未收到這門課的發布分層診斷。</p>';
+  return `<div class="admin-section-health">${(course.sections || []).map((section) => {
+    const metric = runtime.publication.sections?.[section.id] || {};
+    const available = Number(metric.available || 0);
+    const visible = runtime.publication.visible === true && metric.visible === true;
+    const publishedCount = Number(metric.published || 0);
+    const tone = !visible ? 'hidden' : available > publishedCount ? 'attention' : 'ready';
+    return `<div data-tone="${tone}"><span>${esc(section.label)}</span><strong>${publishedCount}<small> / ${available}</small></strong><em>${!visible ? '設定隱藏' : available > publishedCount ? '部分未公開' : '已到前台'}</em></div>`;
+  }).join('')}</div>`;
+}
+
+function renderAnki(runtime) {
+  if (!runtime.operations) return '<p class="admin-empty">等待新版 projection 回報 Anki 發布狀態。</p>';
+  if (!runtime.release) return '<p class="admin-empty">尚未建立這門課的原生 Anki 發布紀錄。</p>';
+  return `<dl class="admin-release">
+    <div><dt>原生包狀態</dt><dd>${esc(runtime.release.status || '未標示')}</dd></div>
+    <div><dt>生成時間</dt><dd>${esc(formatDate(runtime.release.generatedAt, true))}</dd></div>
+    <div><dt>Note 數</dt><dd>${Number(runtime.release.noteCount || 0)}</dd></div>
+    <div><dt>Note 類型</dt><dd>${esc((runtime.release.noteTypes || []).join('、') || '尚無卡片')}</dd></div>
+  </dl>`;
+}
+
+function renderSettings(course) {
+  return `<details class="admin-settings"><summary>公開設定與區塊順序</summary>
+    <div class="admin-course-fields">
+      <label class="admin-toggle"><input type="checkbox" data-field="visible" ${course.visible ? 'checked' : ''}><span>前台顯示這門課</span></label>
+      <label><span>前台名稱</span><input data-field="courseLabel" value="${esc(course.courseLabel)}"></label>
+      <label><span>課程順序</span><input type="number" data-field="order" value="${Number(course.order || 0)}"></label>
+      <p>課程結構：<code>${esc(course.shape)}</code></p>
+    </div>
+    <div class="admin-section-list">${(course.sections || []).map((section, sectionIndex) => `<div data-section-index="${sectionIndex}">
+      <label class="admin-toggle"><input type="checkbox" data-section-field="visible" ${section.visible ? 'checked' : ''}><span>顯示區塊</span></label>
+      <label><span>區塊名稱</span><input data-section-field="label" value="${esc(section.label)}"></label>
+      <label><span>順序</span><input type="number" data-section-field="order" value="${Number(section.order || 0)}"></label>
+      <code>${esc(section.id)}</code>
+    </div>`).join('')}</div>
+    <p class="admin-settings__note">後台有資料不會自動公開。只有課程與區塊都開啟，而且資料本身通過公開條件時，前台數量才會增加。</p>
+  </details>`;
+}
+
+function renderCourse(course, courseIndex) {
+  const runtime = courseRuntime(course);
+  const [tone, status] = recordTone(runtime);
+  const latest = runtime.health?.latestSession;
+  return `<article class="admin-course" data-course-index="${courseIndex}">
+    <header class="admin-course__head">
+      <div><h2>${esc(course.courseLabel)}</h2><p>${latest ? `${esc(formatDate(latest.date))} · ${esc(latest.title)}` : '尚無可顯示的最近一課'}</p></div>
+      <span class="admin-status" data-tone="${tone}"><i aria-hidden="true"></i>${esc(status)}</span>
+    </header>
+    <div class="admin-course__body">
+      <section><h3>複習紀錄</h3>${renderRecordFields(runtime)}</section>
+      <section><h3>Anki 原生包</h3>${renderAnki(runtime)}</section>
+    </div>
+    <section class="admin-course__publication"><h3>後台 / 前台數量</h3>${renderPublication(course, runtime)}</section>
+    ${renderSettings(course)}
+  </article>`;
 }
 
 function render() {
   const status = dataState.status || {};
+  const courses = draft.courses || [];
+  const runtimes = courses.map(courseRuntime);
+  const hasOperations = runtimes.some((runtime) => Boolean(runtime.operations));
+  const completeCount = runtimes.filter((runtime) => runtime.health?.latestSession?.complete === true).length;
+  const projectedVersion = Number(dataState.snapshot?.publication?.configVersion || 0);
   root.innerHTML = `<div class="admin-shell">
-    <header class="admin-header"><div><a href="./">← 回學習網站</a><h1>Learning Platform 管理</h1><p>課程與區塊的公開設定、預覽，以及資料鏈診斷。</p></div><div class="admin-publish ${isDirty() ? 'is-draft' : 'is-published'}"><strong>${isDirty() ? '有未發布草稿' : '與已發布設定一致'}</strong><span>設定版本 ${Number(published.version || 0)}</span></div></header>
-    <section class="admin-actions"><button type="button" data-admin-preview>預覽草稿</button><button type="button" data-admin-download>下載可發布設定</button><button type="button" data-admin-reset>捨棄草稿</button><p>正式發布：以下載內容更新 canonical repo 的 <code>pages/platform-config.json</code>，經驗證、commit 與部署後生效。</p></section>
-    <section class="admin-diagnostics"><h2>資料鏈狀態</h2><div class="admin-chain"><article><b>Learning Data → Projection</b><span>${esc(dataState.snapshot?.publication?.projectedAt || dataState.snapshot?.generatedAt || '等待資料')}</span></article><article><b>發布資料</b><span>${esc(attemptLabel(status.attempts?.published))}</span></article><article><b>背景更新</b><span>${esc(attemptLabel(status.attempts?.live))}</span></article><article><b>目前前台 runtime</b><span>${esc(status.source || 'shell')}</span></article></div></section>
-    <section class="admin-courses"><h2>課程與區塊</h2>${(draft.courses || []).map((course, courseIndex) => `<article class="admin-course" data-course-index="${courseIndex}">
-      <div class="admin-course__head"><label><input type="checkbox" data-field="visible" ${course.visible ? 'checked' : ''}> 顯示課程</label><label>前台名稱<input data-field="courseLabel" value="${esc(course.courseLabel)}"></label><label>順序<input type="number" data-field="order" value="${Number(course.order || 0)}"></label><span class="admin-shape">${esc(course.shape)}</span></div>
-      <div class="admin-section-list">${(course.sections || []).map((section, sectionIndex) => `<div data-section-index="${sectionIndex}"><label><input type="checkbox" data-section-field="visible" ${section.visible ? 'checked' : ''}> 顯示</label><label>區塊名稱<input data-section-field="label" value="${esc(section.label)}"></label><label>順序<input type="number" data-section-field="order" value="${Number(section.order || 0)}"></label><code>${esc(section.id)}</code></div>`).join('')}</div>
-      <div class="admin-course__diagnostic">${courseDiagnostics(course)}</div>
-    </article>`).join('')}</section>
+    <nav class="admin-nav" aria-label="管理頁導航"><a class="admin-wordmark" href="./admin.html">Learning Platform</a><a class="admin-back" href="./">回前台</a></nav>
+    <header class="admin-overview">
+      <div class="admin-overview__copy"><h1>上完課，這裡要看得到。</h1><p>先確認複習紀錄、Anki 與發布鏈，再決定哪些課程內容要公開。慢速 GAS 只在背景更新，不會阻塞這個管理頁。</p></div>
+      <div class="admin-overview__figure" aria-live="polite"><strong>${hasOperations ? completeCount : '—'}</strong><span>${hasOperations ? ` / ${courses.length} 門課的最近紀錄完整` : '等待新版紀錄診斷'}</span></div>
+    </header>
+    <section class="admin-chain" aria-label="資料鏈狀態">
+      <article><span>目前使用</span><strong>${esc(sourceLabel(status.source))}</strong><small>${esc(formatDate(status.generatedAt, true))}</small></article>
+      <article><span>已發布快照</span><strong>${esc(attemptLabel(status.attempts?.published))}</strong><small>失敗時仍使用舊資料</small></article>
+      <article><span>GAS 背景更新</span><strong>${esc(attemptLabel(status.attempts?.live))}</strong><small>不阻塞首頁與導航</small></article>
+      <article><span>設定版本</span><strong>${projectedVersion || '—'} / ${Number(published.version || 0)}</strong><small>${projectedVersion && projectedVersion !== Number(published.version || 0) ? 'projection 與前端不一致' : 'projection / 前端'}</small></article>
+    </section>
+    <section class="admin-toolbar">
+      <div class="admin-publish" data-tone="${isDirty() ? 'attention' : 'ready'}"><i aria-hidden="true"></i><div><strong>${isDirty() ? '有未發布草稿' : '設定已同步'}</strong><span>正式設定版本 ${Number(published.version || 0)}</span></div></div>
+      <div class="admin-actions"><button class="admin-button admin-button--secondary" type="button" data-admin-preview>預覽草稿</button><button class="admin-button admin-button--primary" type="button" data-admin-download>下載設定</button><button class="admin-button admin-button--quiet" type="button" data-admin-reset>捨棄草稿</button></div>
+      <p>下載後仍須在 canonical repo 驗證、commit、部署；此公開管理頁不持有試算表權限或憑證。</p>
+    </section>
+    <main class="admin-courses">${courses.map(renderCourse).join('')}</main>
+    <footer class="admin-footer"><span>Learning Platform 管理</span><span>canonical：teach-workspace</span><span>learner-facing mirror：teach-workspace-web</span></footer>
   </div>`;
 }
 
