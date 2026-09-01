@@ -71,7 +71,7 @@ function courseRuntime(course) {
   const payload = dataState.snapshot?.learning?.courses?.[course.id] || null;
   const publication = dataState.snapshot?.publication?.courses?.[course.id] || null;
   const operations = payload?.operations || null;
-  return { payload, publication, operations, health: operations?.recordHealth || null, release: operations?.ankiRelease || null };
+  return { payload, publication, operations, health: operations?.recordHealth || null };
 }
 
 function recordTone(runtime) {
@@ -97,17 +97,6 @@ function renderPublication(course, runtime) {
     const tone = !visible ? 'hidden' : available > publishedCount ? 'attention' : 'ready';
     return `<div data-tone="${tone}"><span>${esc(section.label)}</span><strong>${publishedCount}<small> / ${available}</small></strong><em>${!visible ? '設定隱藏' : available > publishedCount ? '部分未公開' : '已到前台'}</em></div>`;
   }).join('')}</div>`;
-}
-
-function renderAnki(runtime) {
-  if (!runtime.operations) return '<p class="admin-empty">等待新版 projection 回報 Anki 發布狀態。</p>';
-  if (!runtime.release) return '<p class="admin-empty">尚未建立這門課的原生 Anki 發布紀錄。</p>';
-  return `<dl class="admin-release">
-    <div><dt>原生包狀態</dt><dd>${esc(runtime.release.status || '未標示')}</dd></div>
-    <div><dt>生成時間</dt><dd>${esc(formatDate(runtime.release.generatedAt, true))}</dd></div>
-    <div><dt>Note 數</dt><dd>${Number(runtime.release.noteCount || 0)}</dd></div>
-    <div><dt>Note 類型</dt><dd>${esc((runtime.release.noteTypes || []).join('、') || '尚無卡片')}</dd></div>
-  </dl>`;
 }
 
 function renderSettings(course) {
@@ -139,7 +128,6 @@ function renderCourse(course, courseIndex) {
     </header>
     <div class="admin-course__body">
       <section><h3>複習紀錄</h3>${renderRecordFields(runtime)}</section>
-      <section><h3>Anki 原生包</h3>${renderAnki(runtime)}</section>
     </div>
     <section class="admin-course__publication"><h3>後台 / 前台數量</h3>${renderPublication(course, runtime)}</section>
     ${renderSettings(course)}
@@ -161,7 +149,7 @@ function render() {
   root.innerHTML = `<div class="admin-shell">
     <nav class="admin-nav" aria-label="管理頁導航"><a class="admin-wordmark" href="./admin.html">Learning Platform</a><a class="admin-back" href="./">回前台</a></nav>
     <header class="admin-overview">
-      <div class="admin-overview__copy"><h1>上完課，這裡要看得到。</h1><p>先確認複習紀錄、Anki 與發布鏈，再決定哪些課程內容要公開。慢速 GAS 只在背景更新，不會阻塞這個管理頁。</p></div>
+      <div class="admin-overview__copy"><h1>上完課，這裡要看得到。</h1><p>先確認複習紀錄與發布鏈，再決定哪些課程內容要公開。慢速 GAS 只在背景更新，不會阻塞這個管理頁。</p></div>
       <div class="admin-overview__figure" aria-live="polite"><strong>${hasOperations ? completeCount : '—'}</strong><span>${hasOperations ? ` / ${courses.length} 門課的最近紀錄完整` : '等待新版紀錄診斷'}</span></div>
     </header>
     <section class="admin-chain" aria-label="資料鏈狀態">

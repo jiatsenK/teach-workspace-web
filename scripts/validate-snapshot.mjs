@@ -18,15 +18,13 @@ const questionKeys = new Set(['id', 'examLabel', 'prompt', 'memorization', 'note
 const memorizationKeys = new Set(['status', 'text']);
 const noteKeys = new Set(['id', 'title', 'text', 'mnemonic']);
 const sessionKeys = new Set(['date', 'title', 'track', 'learningScope', 'completedSummary', 'learningAdjustments', 'reviewSummary', 'learnerPerformance', 'reviewNeeded', 'nextStart', 'sessionId', 'unitId', 'source', 'content', 'vocabulary']);
-const reviewKeys = new Set(['queue', 'notes', 'anki']);
+const reviewKeys = new Set(['queue', 'notes']);
 const reviewItemKeys = new Set(['id', 'unitId', 'sessionId', 'type', 'text', 'status', 'lastReview', 'nextReview']);
 const reviewNoteKeys = new Set(['id', 'unitId', 'sessionId', 'title', 'text', 'mnemonic', 'updatedAt']);
-const reviewAnkiKeys = new Set(['id', 'type', 'prompt', 'response', 'tags']);
-const operationsKeys = new Set(['recordHealth', 'ankiRelease']);
-const recordHealthKeys = new Set(['latestSession', 'sessionCount', 'ankiPackageReady']);
+const operationsKeys = new Set(['recordHealth']);
+const recordHealthKeys = new Set(['latestSession', 'sessionCount']);
 const latestSessionHealthKeys = new Set(['sessionId', 'date', 'title', 'fields', 'complete']);
 const recordFieldKeys = new Set(['stableId', 'learningScope', 'completedSummary', 'reviewSummary', 'learnerPerformance', 'nextStart']);
-const ankiReleaseKeys = new Set(['generatedAt', 'noteCount', 'noteTypes', 'status']);
 const forbiddenKeys = /(?:raw|stateText|syllabusText|corrections?|answers?|credential|token|secret|email|phone|address|projectKey|sheetId|spreadsheetId)/i;
 const forbiddenValues = /(?:CORR|CACHE|RES)-\d+|(?:korean|japanese|english|construction)\/[a-z0-9-]+/i;
 const memoryStatuses = new Set(['未開始', '待記憶', '練習中', '已記住', '待複習']);
@@ -80,7 +78,7 @@ function validateSession(session, path) {
   for (const item of session.vocabulary || []) validateVocabulary(item, `${path}.vocabulary[]`);
 }
 
-assert(snapshot.schemaVersion === 4, 'Unexpected snapshot schemaVersion');
+assert(snapshot.schemaVersion === 5, 'Unexpected snapshot schemaVersion');
 assertKeys(snapshot, topKeys, '$');
 assert(snapshot.learning && typeof snapshot.learning === 'object', 'Missing learning payload');
 assert(snapshot.monthly && typeof snapshot.monthly === 'object', 'Missing monthly payload');
@@ -119,18 +117,12 @@ for (const [id, course] of Object.entries(courses)) {
     assertPublicText(note.text, 8000, `${id}.review.notes.text`);
     assertPublicText(note.mnemonic, 1000, `${id}.review.notes.mnemonic`);
   }
-  for (const note of course.review?.anki || []) {
-    assertKeys(note, reviewAnkiKeys, `$.learning.courses.${id}.review.anki[]`);
-    assertPublicText(note.prompt, 4000, `${id}.review.anki.prompt`);
-    assertPublicText(note.response, 8000, `${id}.review.anki.response`);
-  }
   if (course.operations !== undefined) {
     assertKeys(course.operations, operationsKeys, `$.learning.courses.${id}.operations`);
     assert(course.operations.recordHealth && typeof course.operations.recordHealth === 'object', `Missing recordHealth for ${id}`);
     const health = course.operations.recordHealth || {};
     assertKeys(health, recordHealthKeys, `$.learning.courses.${id}.operations.recordHealth`);
     assert(Number.isInteger(health.sessionCount) && health.sessionCount >= 0, `Invalid sessionCount for ${id}`);
-    assert(typeof health.ankiPackageReady === 'boolean', `Invalid ankiPackageReady for ${id}`);
     if (health.latestSession !== null) {
       assertKeys(health.latestSession, latestSessionHealthKeys, `$.learning.courses.${id}.operations.recordHealth.latestSession`);
       assertPublicText(health.latestSession.sessionId, 80, `${id}.operations.latestSession.sessionId`);
@@ -143,15 +135,6 @@ for (const [id, course] of Object.entries(courses)) {
       }
       assert(typeof health.latestSession.complete === 'boolean', `Invalid record completeness for ${id}`);
       assert(health.latestSession.complete === Object.values(health.latestSession.fields || {}).every(Boolean), `Record completeness mismatch for ${id}`);
-    }
-    const release = course.operations.ankiRelease;
-    if (release !== null) {
-      assertKeys(release, ankiReleaseKeys, `$.learning.courses.${id}.operations.ankiRelease`);
-      assertPublicText(release.generatedAt, 80, `${id}.operations.ankiRelease.generatedAt`);
-      assert(Number.isInteger(release.noteCount) && release.noteCount >= 0, `Invalid Anki noteCount for ${id}`);
-      assert(Array.isArray(release.noteTypes) && release.noteTypes.length <= 20, `Invalid Anki noteTypes for ${id}`);
-      for (const type of release.noteTypes) assertPublicText(type, 120, `${id}.operations.ankiRelease.noteTypes[]`);
-      assertPublicText(release.status, 80, `${id}.operations.ankiRelease.status`);
     }
   }
   if (course.exam !== undefined) {

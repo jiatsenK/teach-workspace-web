@@ -298,10 +298,8 @@ function reviewView(coursePayload, context) {
   const review = coursePayload?.review || {};
   const sessionIds = new Set(context.sessionIds || []);
   const queue = (review.queue || coursePayload?.reviewQueue || []).filter((item) => item.unitId === context.unitId || (item.sessionId && sessionIds.has(item.sessionId)));
-  const anki = review.anki || [];
-  return `<article class="b2-reading-page b2-review-center"><div class="b2-reading-meta"><span>單元複習</span><span>${queue.length + anki.length} 筆可用內容</span></div><h1>複習 ${esc(context.label || '這個單元')}</h1><p class="b2-helper">「待複習」是課程整理標記，不會讀取或改動 Anki 的排程。Anki 到期日仍由本機 Anki 管理。</p>
-    <section class="b2-review-group"><h2>課程待複習</h2>${queue.length ? `<div class="b2-reading-sections">${queue.map((item) => `<section><span>${esc(item.type || item.status || '複習')}</span><p>${esc(item.text || '')}</p>${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</section>`).join('')}</div>` : '<div class="b2-data-note"><strong>這個單元目前沒有已連結的待複習項目。</strong><p>未帶 Unit／Session ID 的舊資料不會再錯放到每一課。</p></div>'}</section>
-    ${anki.length ? `<section class="b2-review-group"><h2>Anki 卡片</h2><div class="b2-anki-list">${anki.map((card) => `<details><summary>${esc(card.prompt || '')}</summary><p>${esc(card.response || '')}</p>${card.tags ? `<small>${esc(card.tags)}</small>` : ''}</details>`).join('')}</div></section>` : ''}</article>`;
+  return `<article class="b2-reading-page b2-review-center"><div class="b2-reading-meta"><span>單元複習</span><span>${queue.length} 筆可用內容</span></div><h1>複習 ${esc(context.label || '這個單元')}</h1><p class="b2-helper">「待複習」是課程整理標記；若另行輸出 Anki 套件，本機排程仍由 Anki 管理。</p>
+    <section class="b2-review-group"><h2>課程待複習</h2>${queue.length ? `<div class="b2-reading-sections">${queue.map((item) => `<section><span>${esc(item.type || item.status || '複習')}</span><p>${esc(item.text || '')}</p>${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</section>`).join('')}</div>` : '<div class="b2-data-note"><strong>這個單元目前沒有已連結的待複習項目。</strong><p>未帶 Unit／Session ID 的舊資料不會再錯放到每一課。</p></div>'}</section></article>`;
 }
 
 function notesView(coursePayload, context, courseId) {
@@ -349,7 +347,7 @@ function learningView(data) {
         : section === 'session'
           ? useSessions ? sessionReader(selectedSession, data.selectedCoursePayload, data.selectedCourse?.id) : unitSessionsReader(data.selectedUnit, linkedSessions)
           : selectedLessonId === 'course-materials' ? courseMaterialsReader(data.selectedCourse) : unitReader(data.selectedUnit);
-  const reviewTab = visibleSection(data.selectedCourse?.id, 'review') || visibleSection(data.selectedCourse?.id, 'notes') || visibleSection(data.selectedCourse?.id, 'anki')
+  const reviewTab = visibleSection(data.selectedCourse?.id, 'review') || visibleSection(data.selectedCourse?.id, 'notes')
     ? `<button type="button" data-proto-section="review" class="${section === 'review' ? 'is-active' : ''}">複習</button>` : '';
   const notesTab = visibleSection(data.selectedCourse?.id, 'notes') ? `<button type="button" data-proto-section="notes" class="${section === 'notes' ? 'is-active' : ''}">筆記</button>` : '';
   const learnTab = useSessions ? '' : `<button type="button" data-proto-section="learn" class="${section === 'learn' ? 'is-active' : ''}">教材</button>`;
