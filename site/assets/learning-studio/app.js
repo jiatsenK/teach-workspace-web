@@ -1,5 +1,5 @@
 import { createLearningDataProvider } from '../data-provider.js';
-import { groupFootprintsByDate, notesForContext, sessionsForUnit } from './course-context.js';
+import { groupFootprintsByDate, notesForContext, sessionsForUnit, unitIdForSession } from './course-context.js';
 import { writeLearningNote } from './note-client.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
@@ -121,8 +121,7 @@ function topbar(section) {
 function homeView(subjects, courseMap) {
   return `<main class="b2-home">
     <section class="b2-opening">
-      <div><h1>今天想打開哪一門？</h1><p>首頁先保留所有學科。選一門後，目錄和課文會在同一個閱讀畫面裡出現。</p></div>
-      <aside><strong>先選，再專心讀一頁。</strong></aside>
+      <div><h1>今天想打開哪一門？</h1></div>
     </section>
     <nav class="b2-subject-grid" aria-label="選擇學科">${subjects.map((subject, index) => {
       const courses = allCourseIds(subject).map((id) => courseMap[id]).filter(Boolean);
@@ -133,7 +132,6 @@ function homeView(subjects, courseMap) {
         <b>打開 →</b>
       </button>`;
     }).join('')}</nav>
-    <footer class="b2-statement"><p>首頁負責選方向，閱讀器只負責讓你看懂一課。</p></footer>
   </main>`;
 }
 
@@ -231,6 +229,54 @@ function sessionList(coursePayload, hierarchyCourse, selectedLessonId, courseId)
   return materialsLink + (coursePayload?.historySessions || coursePayload?.sessions || []).map((session) => `<button type="button" data-proto-lesson="${esc(session.sessionId)}" data-proto-course="${esc(courseId)}" class="b2-lesson-link ${session.sessionId === selectedLessonId ? 'is-active' : ''}"><span>${esc((session.date || '').slice(5))}</span><strong>${esc(session.title || '未命名學習回合')}</strong><small>學習回合</small></button>`).join('');
 }
 
+function timelineSessionList(sessions, selectedSessionId) {
+  return sessions.map((session) => `<button type="button" data-proto-jump="session-${esc(session.sessionId)}" class="b2-lesson-link ${session.sessionId === selectedSessionId ? 'is-active' : ''}"><span>${esc((session.date || '').slice(5))}</span><strong>${esc(session.title || '未命名學習回合')}</strong><small>學習回合</small></button>`).join('');
+}
+
+function sortedTimelineSessions(sessions) {
+  return sessions.map((session, index) => ({ session, index }))
+    .sort((left, right) => String(right.session.date || '').localeCompare(String(left.session.date || '')) || left.index - right.index)
+    .map(({ session }) => session);
+}
+
+function linkTimelineItems(items, sessions, contentPlacement = 'unit') {
+  const bySession = Object.fromEntries(sessions.map((session) => [session.sessionId, []]));
+  const sessionIds = new Set(Object.keys(bySession));
+  const unbound = [];
+  items.forEach((item) => {
+    if (item.sessionId && sessionIds.has(item.sessionId)) {
+      bySession[item.sessionId].push(item);
+      return;
+    }
+    const itemUnitId = unitIdForSession({ unitId: item.unitId }, { contentPlacement });
+    const target = itemUnitId ? sessions.find((session) => unitIdForSession(session, { contentPlacement }) === itemUnitId) : null;
+    if (target) bySession[target.sessionId].push(item); else unbound.push(item);
+  });
+  return { bySession, unbound };
+}
+
+function timelineNoteEditor(session, courseId, notes) {
+  const editableNote = notes.find((note) => note.sessionId === session.sessionId && !note.unitId);
+  return `<section class="b2-note-editor" data-note-form data-course-id="${esc(courseId)}" data-unit-id="" data-session-id="${esc(session.sessionId)}">
+    <label>筆記標題<input type="text" data-note-title value="${esc(editableNote?.title || session.title || '我的筆記')}" maxlength="120"></label>
+    <label>筆記內容<textarea data-note-text rows="8" maxlength="20000" placeholder="寫下這次學習要記住的內容、自己的理解或補充。">${esc(editableNote?.text || '')}</textarea></label>
+    <label>寫入金鑰<input type="password" data-note-key autocomplete="current-password" placeholder="只保留於本次分頁"></label>
+    <div><button type="button" data-note-save>儲存到學習筆記</button><span data-note-status aria-live="polite">儲存後會以這個 Session 寫回學習筆記。</span></div>
+  </section>`;
+}
+
+function timelineSessionCard(session, queue = [], notes = [], selected = false, courseId = '') {
+  const content = Array.isArray(session.content) ? session.content : [];
+  const vocabulary = Array.isArray(session.vocabulary) ? session.vocabulary : [];
+  const meta = session.date || session.track ? `<div class="b2-reading-meta">${session.date ? `<span>${esc(session.date)}</span>` : ''}${session.track ? `<span>${esc(session.track)}</span>` : ''}</div>` : '';
+  const review = session.reviewNeeded || queue.length ? `<section class="b2-timeline-review"><h3>這次要複習</h3>${session.reviewNeeded ? `<p>${esc(session.reviewNeeded)}</p>` : ''}${queue.length ? `<ul>${queue.map((item) => `<li>${esc(item.text || '')}${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</li>`).join('')}</ul>` : ''}</section>` : '';
+  const linkedContent = content.length ? `<details class="b2-timeline-details"><summary>連結的教材 <span>${content.length}</span></summary><div class="b2-content-blocks">${content.map((item) => `<section data-content-id="${esc(item.id || '')}"><span>${esc(item.type || '學習內容')}</span><h3>${esc(item.label || '本次重點')}</h3>${item.explanation ? `<p>${esc(item.explanation)}</p>` : ''}${item.sourceRange ? `<small>來源：${esc(item.sourceRange)}</small>` : ''}</section>`).join('')}</div></details>` : '';
+  const linkedVocabulary = vocabulary.length ? `<details class="b2-timeline-details"><summary>連結的單字 <span>${vocabulary.length}</span></summary><div class="b2-vocab">${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>課程標記：${esc(item.memoryStatus || '未開始')}${item.memoryStatus === '待複習' ? '（不等於 Anki 到期）' : ''}</small></div>`).join('')}</div></details>` : '';
+  const noteDocuments = notes.length ? `<div class="b2-note-document">${notes.map((note) => `<section><time>${esc(note.updatedAt || '')}</time><h3>${esc(note.title || '未命名筆記')}</h3><p>${esc(note.text || '')}</p>${note.mnemonic ? `<small>記憶口訣：${esc(note.mnemonic)}</small>` : ''}</section>`).join('')}</div>` : '';
+  const noteSection = notes.length || selected ? `<section class="b2-timeline-notes"><h3>我的筆記</h3>${noteDocuments}${selected ? timelineNoteEditor(session, courseId, notes) : ''}</section>` : '';
+  return `<article id="session-${esc(session.sessionId)}" class="b2-timeline-card ${selected ? 'is-selected' : ''}">${meta}${session.title ? `<h2>${esc(session.title)}</h2>` : ''}${session.learningScope ? `<section><h3>這次學到的範圍</h3><p>${esc(session.learningScope)}</p></section>` : ''}${session.completedSummary ? `<section><h3>完成了什麼</h3><p>${esc(session.completedSummary)}</p></section>` : ''}${session.learnerPerformance ? `<details class="b2-timeline-details"><summary>我的表現</summary><p>${esc(session.learnerPerformance)}</p></details>` : ''}${session.learningAdjustments ? `<details class="b2-timeline-details"><summary>卡住與調整</summary><p>${esc(session.learningAdjustments)}</p></details>` : ''}${review}${linkedContent}${linkedVocabulary}${session.nextStart ? `<section><h3>下次接續</h3><p>${esc(session.nextStart)}</p></section>` : ''}${noteSection}</article>`;
+}
+
 function constructionBranches(mode, coursePayload, hierarchyCourse) {
   const sessionCount = (coursePayload?.historySessions || []).length;
   const topicCount = (hierarchyCourse?.units || []).length;
@@ -247,6 +293,35 @@ function rail(data) {
   const useSessions = shape === 'session-topic' || (shape === 'question-bank-hybrid' && mode === 'sessions');
   const lessonList = useSessions ? sessionList(selectedCoursePayload, selectedCourse, selectedLessonId, selectedCourse?.id) : fixedUnitList(selectedCourse, selectedUnit?.id);
   return `<aside id="course-directory" class="b2-rail ${closed ? 'is-closed' : ''}"><div class="b2-rail__head"><button type="button" data-proto-nav-toggle aria-controls="course-directory" aria-expanded="${!closed}" aria-label="${closed ? '展開課程目錄' : '收起課程目錄'}">${closed ? '展開目錄' : '收起目錄'}</button><div><span>${esc(selectedSubject?.name || '')}</span><strong>${esc(selectedCourse?.name || '')}</strong></div></div><div class="b2-rail__body"><div class="b2-subject-shortcuts">${subjects.map((subject) => `<button type="button" data-proto-subject="${esc(subject.id)}" class="${subject.id === selectedSubject?.id ? 'is-active' : ''}">${esc(subject.name)}</button>`).join('')}</div>${courses.length > 1 ? `<div class="b2-course-list">${courses.map((course) => `<button type="button" data-proto-course="${esc(course.id)}" class="${course.id === selectedCourse?.id ? 'is-active' : ''}">${esc(course.name)}</button>`).join('')}</div>` : ''}${selectedSubject?.id === 'construction' ? constructionBranches(mode, selectedCoursePayload, selectedCourse) : ''}<div class="b2-lesson-list">${lessonList || '<p class="proto-empty">目前沒有可列出的課次。</p>'}</div></div></aside>`;
+}
+
+function timelineRail(data, sessions, selectedSessionId) {
+  const { subjects, courseMap, selectedSubject, selectedCourse, closed } = data;
+  const courses = allCourseIds(selectedSubject).map((id) => courseMap[id]).filter(Boolean);
+  const dateIndex = timelineSessionList(sessions, selectedSessionId);
+  return `<aside id="course-directory" class="b2-rail ${closed ? 'is-closed' : ''}"><div class="b2-rail__head"><button type="button" data-proto-nav-toggle aria-controls="course-directory" aria-expanded="${!closed}" aria-label="${closed ? '展開課程目錄' : '收起課程目錄'}">${closed ? '展開目錄' : '收起目錄'}</button><div><span>${esc(selectedSubject?.name || '')}</span><strong>${esc(selectedCourse?.name || '')}</strong></div></div><div class="b2-rail__body"><div class="b2-subject-shortcuts">${subjects.map((subject) => `<button type="button" data-proto-subject="${esc(subject.id)}" class="${subject.id === selectedSubject?.id ? 'is-active' : ''}">${esc(subject.name)}</button>`).join('')}</div>${courses.length > 1 ? `<div class="b2-course-list">${courses.map((course) => `<button type="button" data-proto-course="${esc(course.id)}" class="${course.id === selectedCourse?.id ? 'is-active' : ''}">${esc(course.name)}</button>`).join('')}</div>` : ''}<div class="b2-lesson-list">${dateIndex || '<p class="proto-empty">目前沒有可列出的學習日期。</p>'}</div></div></aside>`;
+}
+
+function timelineOutline(data) {
+  const units = data.selectedCourse?.units || [];
+  const next = data.selectedCoursePayload?.next;
+  return `<div class="b2-outline-view">${next ? `<section class="b2-outline-next"><h2>接下來</h2><p>${esc(next)}</p></section>` : ''}<nav class="b2-outline-units" aria-label="課程單元">${fixedUnitList(data.selectedCourse, data.selectedUnit?.id)}</nav>${units.length ? unitReader(data.selectedUnit || units[0]) : '<div class="b2-empty-reader"><strong>目前沒有可顯示的課程單元。</strong></div>'}</div>`;
+}
+
+function timelineView(data, sessions, closed) {
+  const requestedSection = params.get('psection');
+  const section = ['timeline', 'outline'].includes(requestedSection) ? requestedSection : 'timeline';
+  const requestedSessionId = params.get('plesson');
+  const selectedSessionId = sessions.some((session) => session.sessionId === requestedSessionId) ? requestedSessionId : sessions[0]?.sessionId || '';
+  const reviewQueue = data.selectedCoursePayload?.review?.queue || data.selectedCoursePayload?.reviewQueue || [];
+  const linkedReview = linkTimelineItems(reviewQueue, sessions);
+  const linkedNotes = linkTimelineItems(data.selectedCoursePayload?.review?.notes || [], sessions);
+  const unboundReview = linkedReview.unbound.length ? `<details class="b2-timeline-unbound"><summary>未綁定複習項目 <span>${linkedReview.unbound.length}</span></summary><ul>${linkedReview.unbound.map((item) => `<li>${esc(item.text || '')}${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</li>`).join('')}</ul></details>` : '';
+  const unboundNotes = linkedNotes.unbound.length ? `<details class="b2-timeline-unbound"><summary>未綁定筆記 <span>${linkedNotes.unbound.length}</span></summary><div class="b2-note-document">${linkedNotes.unbound.map((note) => `<section><time>${esc(note.updatedAt || '')}</time><h3>${esc(note.title || '未命名筆記')}</h3><p>${esc(note.text || '')}</p></section>`).join('')}</div></details>` : '';
+  const content = section === 'outline'
+    ? timelineOutline(data)
+    : `<article class="b2-reading-page"><div class="b2-reading-meta"><span>時間軸</span><span>${sessions.length} 個學習回合</span></div><h1>${esc(data.selectedCourse?.name || '學習時間軸')}</h1>${unboundReview}${unboundNotes}<div class="b2-timeline">${sessions.map((session) => timelineSessionCard(session, linkedReview.bySession[session.sessionId] || [], linkedNotes.bySession[session.sessionId] || [], session.sessionId === selectedSessionId, data.selectedCourse?.id)).join('')}</div></article>`;
+  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${timelineRail(data, sessions, selectedSessionId)}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-section="timeline" class="${section === 'timeline' ? 'is-active' : ''}">時間軸</button><button type="button" data-proto-section="outline" class="${section === 'outline' ? 'is-active' : ''}">課程大綱</button><small>按學習日期回顧</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
 }
 
 function unitReader(unit) {
@@ -324,6 +399,8 @@ function learningView(data) {
   const requestedMode = params.get('pmode');
   const mode = shape === 'question-bank-hybrid' ? (requestedMode === 'topics' || requestedMode === 'topic' ? 'topics' : 'sessions') : '';
   const sessions = data.selectedCoursePayload?.historySessions || data.selectedCoursePayload?.sessions || [];
+  const timelineOn = visibleSection(data.selectedCourse?.id, 'timeline');
+  if (timelineOn) return timelineView(data, sortedTimelineSessions(sessions), closed);
   const hasCourseMaterials = visibleSection(data.selectedCourse?.id, 'course-materials') && (data.selectedCourse?.courseContent || []).length + (data.selectedCourse?.courseVocabulary || []).length > 0;
   const selectedLessonId = params.get('plesson') || (hasCourseMaterials ? 'course-materials' : sessions[0]?.sessionId) || '';
   const selectedSession = sessions.find((item) => item.sessionId === selectedLessonId) || sessions[0];
@@ -353,7 +430,7 @@ function learningView(data) {
   const learnTab = useSessions ? '' : `<button type="button" data-proto-section="learn" class="${section === 'learn' ? 'is-active' : ''}">教材</button>`;
   const sessionLabel = useSessions ? '上課紀錄' : `上課紀錄${linkedSessions.length ? ` ${linkedSessions.length}` : ''}`;
   const helper = section === 'review' ? '教材與複習分開閱讀' : section === 'notes' ? '只屬於目前單元或回合' : '一次只讀一個脈絡';
-  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${rail({ ...data, selectedLessonId, mode, closed })}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-nav-jump aria-controls="course-directory" aria-expanded="${!closed}">${closed ? '開啟目錄' : '收起目錄'}</button>${learnTab}<button type="button" data-proto-section="session" class="${section === 'session' ? 'is-active' : ''}">${sessionLabel}</button>${reviewTab}${notesTab}<small>${helper}</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
+  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${rail({ ...data, selectedLessonId, mode, closed })}<section class="b2-reader"><div class="b2-reader-tabs">${learnTab}<button type="button" data-proto-section="session" class="${section === 'session' ? 'is-active' : ''}">${sessionLabel}</button>${reviewTab}${notesTab}<small>${helper}</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
 }
 
 function render() {
@@ -398,14 +475,14 @@ document.addEventListener('click', async (event) => {
     return;
   }
   if (target.dataset.monthView) return setParams({ pmonthview: target.dataset.monthView });
+  if (target.dataset.protoJump) { const targetId = target.dataset.protoJump; setParams({ plesson:targetId.replace(/^session-/, ''), psection:'timeline' }); requestAnimationFrame(() => document.getElementById(targetId)?.scrollIntoView({ block:'start' })); return; }
   if (target.hasAttribute('data-proto-home')) return setParams({ psubject:'', pcourse:'', punit:'', plesson:'', pmode:'', psection:'', pnav:'', pmonthview:'' });
   if (target.dataset.protoSubject) return setParams({ psubject:target.dataset.protoSubject, pcourse:'', punit:'', plesson:'', pmode:'', psection:'learn' });
   if (target.dataset.protoSection) return setParams({ psection:target.dataset.protoSection });
   if (target.hasAttribute('data-proto-nav-toggle')) return setParams({ pnav: params.get('pnav') === 'closed' ? '' : 'closed' });
-  if (target.hasAttribute('data-proto-nav-jump')) return setParams({ pnav: params.get('pnav') === 'closed' ? '' : 'closed' });
   if (target.dataset.protoMode) return setParams({ pmode:target.dataset.protoMode, punit:'', plesson:'', psection:target.dataset.protoMode === 'sessions' ? 'session' : 'learn' });
   if (target.dataset.protoLesson) { setParams({ pcourse:target.dataset.protoCourse || '', plesson:target.dataset.protoLesson, punit:'', psection:'session' }); requestAnimationFrame(() => document.querySelector('.b2-reader')?.scrollIntoView({ block:'start' })); return; }
-  if (target.dataset.protoUnit) { setParams({ pcourse:target.dataset.protoCourse || '', punit:target.dataset.protoUnit, plesson:'', psection:'learn' }); requestAnimationFrame(() => document.querySelector('.b2-reader')?.scrollIntoView({ block:'start' })); return; }
+  if (target.dataset.protoUnit) { const timelineOn = visibleSection(target.dataset.protoCourse, 'timeline'); setParams({ pcourse:target.dataset.protoCourse || '', punit:target.dataset.protoUnit, plesson:'', psection:timelineOn ? 'outline' : 'learn' }); requestAnimationFrame(() => document.querySelector('.b2-reader')?.scrollIntoView({ block:'start' })); return; }
   if (target.dataset.protoCourse) return setParams({ pcourse:target.dataset.protoCourse, punit:'', plesson:'', pmode:'', psection:'learn' });
 });
 
