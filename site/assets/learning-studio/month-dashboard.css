@@ -162,6 +162,10 @@
   overflow: hidden;
 }
 
+[data-first-paint] .b2-month-panel .b2-calendar__cell {
+  animation: b2-enter-up 300ms var(--ease-out) both;
+}
+
 .b2-month-panel .b2-calendar__cell span {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -208,6 +212,11 @@
   height: 100%;
   border-radius: inherit;
   background: var(--color-accent-2);
+  transform-origin: left center;
+}
+
+[data-first-paint] .b2-course-bar__fill {
+  animation: b2-reveal-horizontal 300ms var(--ease-out) both;
 }
 
 .b2-course-bar span {
@@ -253,6 +262,11 @@
   height: max(0.2rem, var(--bar));
   border-radius: var(--radius-tight) var(--radius-tight) 0 0;
   background: var(--color-accent);
+  transform-origin: center bottom;
+}
+
+[data-first-paint] .b2-daily-bar i {
+  animation: b2-reveal-vertical 300ms var(--ease-out) both;
 }
 
 .b2-daily-bar.is-zero i {
@@ -318,5 +332,13 @@
   .b2-daily-bars {
     overflow-x: auto;
     grid-template-columns: repeat(var(--days), minmax(0.7rem, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-first-paint] .b2-month-panel .b2-calendar__cell,
+  [data-first-paint] .b2-course-bar__fill,
+  [data-first-paint] .b2-daily-bar i {
+    animation: none;
   }
 }

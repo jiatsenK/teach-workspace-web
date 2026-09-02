@@ -67,6 +67,7 @@ const state = {
   monthly: null,
   dataStatus: { source: 'shell', hasData: false, refreshing: true, attempts: {} },
 };
+let firstPaint = true;
 
 function allCourseIds(subject) {
   return [...(subject?.currentCourseIds || []), ...(subject?.historyCourseIds || [])];
@@ -112,7 +113,7 @@ function topbar(section) {
       <button type="button" data-proto-home class="${!section ? 'is-active' : ''}">首頁</button>
       <button type="button" data-proto-section="month" class="${section === 'month' ? 'is-active' : ''}">本月學習狀況</button>
     </nav>
-    <span class="b2-data-freshness" data-data-source="${esc(state.dataStatus.source)}">${esc(freshnessLabel())}</span>
+    <span class="b2-data-freshness" data-data-source="${esc(state.dataStatus.source)}"${state.dataStatus.refreshing ? ' data-refreshing="true"' : ''}>${esc(freshnessLabel())}</span>
     <a class="b2-admin-link" href="./admin.html">管理</a>
   </header>`;
 }
@@ -124,7 +125,7 @@ function homeView(subjects, courseMap) {
     </section>
     <nav class="b2-subject-grid" aria-label="選擇學科">${subjects.map((subject, index) => {
       const courses = allCourseIds(subject).map((id) => courseMap[id]).filter(Boolean);
-      return `<button type="button" data-proto-subject="${esc(subject.id)}" class="b2-subject b2-subject--${(index % 4) + 1}">
+      return `<button type="button" data-proto-subject="${esc(subject.id)}" class="b2-subject b2-subject--${(index % 4) + 1}" style="--i:${index}">
         <span>${String(index + 1).padStart(2, '0')}</span>
         <strong>${esc(subject.name)}</strong>
         <small>${courses.length} 門課程 · ${esc(courses[0]?.name || '目前沒有課程')}</small>
@@ -408,7 +409,16 @@ function render() {
     name: data.courseMap[course.id]?.name || course.id,
     sessions: course.historySessions || course.sessions || [],
   })));
-  document.getElementById('app').innerHTML = `<div class="variant-b2">${topbar(section)}${section === 'month' ? monthView(state.monthly, footprints) : isHome ? homeView(data.subjects, data.courseMap) : learningView(data)}</div>`;
+  const app = document.getElementById('app');
+  app.innerHTML = `<div class="variant-b2">${topbar(section)}${section === 'month' ? monthView(state.monthly, footprints) : isHome ? homeView(data.subjects, data.courseMap) : learningView(data)}</div>`;
+  if (firstPaint) {
+    const firstPaintRoot = app.firstElementChild;
+    firstPaintRoot?.setAttribute('data-first-paint', '');
+    firstPaint = false;
+    requestAnimationFrame(() => {
+      setTimeout(() => firstPaintRoot?.removeAttribute('data-first-paint'), 700);
+    });
+  }
 }
 
 document.addEventListener('click', (event) => {
