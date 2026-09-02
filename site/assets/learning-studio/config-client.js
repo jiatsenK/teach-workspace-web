@@ -7,7 +7,7 @@ export async function readLearningWriteStatus(fetchImpl = fetch) {
   if (!response.ok) throw new Error(`設定服務暫時無法使用（HTTP ${response.status}）。`);
   const status = await response.json();
   return {
-    noteWriteEnabled: status.noteWriteEnabled === true,
+    adminKeyConfigured: status.adminKeyConfigured === true,
     configPublishEnabled: status.configPublishEnabled === true,
     repository: String(status.repository || ''),
   };

@@ -2,7 +2,7 @@ import { createLearningDataProvider } from './data-provider.js';
 import { publishLearningPlatformConfig, readLearningWriteStatus } from './learning-studio/config-client.js';
 
 const DRAFT_KEY = 'learning-platform.admin-draft.v1';
-const WRITE_KEY = 'learning-platform.note-write-key';
+const WRITE_KEY = 'learning-platform.admin-key';
 const root = document.getElementById('admin');
 const published = JSON.parse(document.getElementById('learning-platform-config')?.textContent || '{"version":0,"courses":[]}');
 const RECORD_FIELDS = Object.freeze([
@@ -144,7 +144,7 @@ function render() {
   const publishing = writeState.state === 'publishing';
   const publishDisabled = !isDirty() || publishing;
   const capabilityLabel = writeState.capabilities
-    ? `${writeState.capabilities.noteWriteEnabled ? '管理金鑰已設定' : '管理金鑰未設定'} · ${writeState.capabilities.configPublishEnabled ? 'GitHub 發布已設定' : 'GitHub 發布未設定'}`
+    ? `${writeState.capabilities.adminKeyConfigured ? '管理金鑰已設定' : '管理金鑰未設定'} · ${writeState.capabilities.configPublishEnabled ? 'GitHub 發布已設定' : 'GitHub 發布未設定'}`
     : writeState.message;
   root.innerHTML = `<div class="admin-shell">
     <nav class="admin-nav" aria-label="管理頁導航"><a class="admin-wordmark" href="./admin.html">Learning Platform</a><a class="admin-back" href="./">回前台</a></nav>

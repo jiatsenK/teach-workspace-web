@@ -20,16 +20,6 @@ export function sessionsForUnit(sessions = [], unit = {}, course = {}) {
   return sessions.filter((session) => unitIdForSession(session, course) === unitId);
 }
 
-export function notesForContext(notes = [], context = {}) {
-  const unitId = normalizedUnitId(context.unitId);
-  const sessionIds = new Set((context.sessionIds || []).map((value) => String(value || '').trim()).filter(Boolean));
-  return notes.filter((note) => {
-    const noteUnitId = normalizedUnitId(note.unitId);
-    const noteSessionId = String(note.sessionId || '').trim();
-    return (unitId && noteUnitId === unitId) || (noteSessionId && sessionIds.has(noteSessionId));
-  });
-}
-
 export function contextIdForSelection({ unit, session } = {}) {
   return normalizedUnitId(unit?.id || unit?.unitId) || String(session?.sessionId || '').trim();
 }

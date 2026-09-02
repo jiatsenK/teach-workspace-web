@@ -14,13 +14,11 @@ const unitKeys = new Set(['id', 'number', 'name', 'status', 'sourceRange', 'outl
 const contentKeys = new Set(['id', 'type', 'label', 'explanation', 'sourceRange']);
 const vocabularyKeys = new Set(['id', 'word', 'meaning', 'form', 'memoryStatus', 'sourceRange']);
 const examKeys = new Set(['questionCount', 'questions']);
-const questionKeys = new Set(['id', 'examLabel', 'prompt', 'memorization', 'notes']);
+const questionKeys = new Set(['id', 'examLabel', 'prompt', 'memorization']);
 const memorizationKeys = new Set(['status', 'text']);
-const noteKeys = new Set(['id', 'title', 'text', 'mnemonic']);
 const sessionKeys = new Set(['date', 'title', 'track', 'learningScope', 'completedSummary', 'learningAdjustments', 'reviewSummary', 'learnerPerformance', 'reviewNeeded', 'nextStart', 'sessionId', 'unitId', 'source', 'content', 'vocabulary']);
-const reviewKeys = new Set(['queue', 'notes']);
+const reviewKeys = new Set(['queue']);
 const reviewItemKeys = new Set(['id', 'unitId', 'sessionId', 'type', 'text', 'status', 'lastReview', 'nextReview']);
-const reviewNoteKeys = new Set(['id', 'unitId', 'sessionId', 'title', 'text', 'mnemonic', 'updatedAt']);
 const operationsKeys = new Set(['recordHealth']);
 const recordHealthKeys = new Set(['latestSession', 'sessionCount']);
 const latestSessionHealthKeys = new Set(['sessionId', 'date', 'title', 'fields', 'complete']);
@@ -111,12 +109,6 @@ for (const [id, course] of Object.entries(courses)) {
     assertKeys(item, reviewItemKeys, `$.learning.courses.${id}.review.queue[]`);
     assertPublicText(item.text, 4000, `${id}.review.queue.text`);
   }
-  for (const note of course.review?.notes || []) {
-    assertKeys(note, reviewNoteKeys, `$.learning.courses.${id}.review.notes[]`);
-    assertPublicText(note.title, 240, `${id}.review.notes.title`);
-    assertPublicText(note.text, 8000, `${id}.review.notes.text`);
-    assertPublicText(note.mnemonic, 1000, `${id}.review.notes.mnemonic`);
-  }
   if (course.operations !== undefined) {
     assertKeys(course.operations, operationsKeys, `$.learning.courses.${id}.operations`);
     assert(course.operations.recordHealth && typeof course.operations.recordHealth === 'object', `Missing recordHealth for ${id}`);
@@ -155,13 +147,6 @@ for (const [id, course] of Object.entries(courses)) {
       assertPublicText(question.memorization.text, 6000, `${id}.${question.id}.memorization.text`);
       if (question.memorization.status === 'verified') assert(Boolean(question.memorization.text), `Verified memorization is empty at ${id}.${question.id}`);
       if (question.memorization.status === 'unavailable') assert(question.memorization.text === '', `Unavailable memorization has text at ${id}.${question.id}`);
-      for (const note of question.notes || []) {
-        assertKeys(note, noteKeys, `${id}.${question.id}.notes[]`);
-        assert(/^NOTE-\d{4}$/.test(note.id), `Invalid note id ${note.id}`);
-        assertPublicText(note.title, 240, `${id}.${question.id}.notes.title`);
-        assertPublicText(note.text, 4000, `${id}.${question.id}.notes.text`);
-        assertPublicText(note.mnemonic, 1000, `${id}.${question.id}.notes.mnemonic`);
-      }
     }
   }
 }
