@@ -21,12 +21,21 @@ function visibleSection(courseId, sectionId) {
   return (courseConfigMap[courseId]?.sections || []).some((section) => section.id === sectionId && section.visible);
 }
 
-// 頁面根是 lang="zh-Hant"；語言課的閱讀內容要覆寫成該語言的 BCP-47，
+// 頁面根是 lang="zh-Hant"。語言課的閱讀內容要覆寫成該語言的 BCP-47，
 // 否則瀏覽器會用繁中字型渲染日文漢字／假名（"字體跑掉"）。
 const CONTENT_LANG = { japanese: 'ja', korean: 'ko', english: 'en' };
 function contentLangAttr(subjectId) {
   const lang = CONTENT_LANG[subjectId];
   return lang ? ` lang="${lang}"` : '';
+}
+
+// 複習卡：有 front 就先只顯示問題、點開才看答案（提取練習）。
+// 沒有 front 的是舊資料，用單行呈現。
+function reviewCardHtml(item) {
+  const due = item.nextReview ? `<small>${item.front ? '下次複習' : '建議'}：${esc(item.nextReview)}</small>` : '';
+  return item.front
+    ? `<details class="b2-review-card"><summary>${esc(item.front)}</summary>${item.back ? `<p>${esc(item.back)}</p>` : ''}${due}</details>`
+    : `<div class="b2-review-card is-legacy"><p>${esc(item.text || '')}</p>${due}</div>`;
 }
 
 function configuredLearning(learning) {
@@ -267,7 +276,7 @@ function timelineSessionCard(session, queue = [], selected = false) {
   const content = Array.isArray(session.content) ? session.content : [];
   const vocabulary = Array.isArray(session.vocabulary) ? session.vocabulary : [];
   const meta = session.date || session.track ? `<div class="b2-reading-meta">${session.date ? `<span>${esc(session.date)}</span>` : ''}${session.track ? `<span>${esc(session.track)}</span>` : ''}</div>` : '';
-  const review = session.reviewNeeded || queue.length ? `<section class="b2-timeline-review"><h3>這次要複習</h3>${session.reviewNeeded ? `<p>${esc(session.reviewNeeded)}</p>` : ''}${queue.length ? `<ul>${queue.map((item) => `<li>${esc(item.text || '')}${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</li>`).join('')}</ul>` : ''}</section>` : '';
+  const review = session.reviewNeeded || queue.length ? `<section class="b2-timeline-review"><h3>這次要複習</h3>${session.reviewNeeded ? `<p>${esc(session.reviewNeeded)}</p>` : ''}${queue.length ? `<div class="b2-review-cards">${queue.map(reviewCardHtml).join('')}</div>` : ''}</section>` : '';
   const linkedContent = content.length ? `<details class="b2-timeline-details"><summary>連結的教材 <span>${content.length}</span></summary><div class="b2-content-blocks">${content.map((item) => `<section data-content-id="${esc(item.id || '')}"><span>${esc(item.type || '學習內容')}</span><h3>${esc(item.label || '本次重點')}</h3>${item.explanation ? `<p>${esc(item.explanation)}</p>` : ''}${item.sourceRange ? `<small>來源：${esc(item.sourceRange)}</small>` : ''}</section>`).join('')}</div></details>` : '';
   const linkedVocabulary = vocabulary.length ? `<details class="b2-timeline-details"><summary>連結的單字 <span>${vocabulary.length}</span></summary><div class="b2-vocab">${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>課程標記：${esc(item.memoryStatus || '未開始')}${item.memoryStatus === '待複習' ? '（不等於 Anki 到期）' : ''}</small></div>`).join('')}</div></details>` : '';
   // 「我的表現」「卡住與調整」（learnerPerformance / learningAdjustments）刻意不在
@@ -370,8 +379,8 @@ function reviewView(coursePayload, context) {
   const review = coursePayload?.review || {};
   const sessionIds = new Set(context.sessionIds || []);
   const queue = (review.queue || coursePayload?.reviewQueue || []).filter((item) => item.unitId === context.unitId || (item.sessionId && sessionIds.has(item.sessionId)));
-  return `<article class="b2-reading-page b2-review-center"><div class="b2-reading-meta"><span>單元複習</span><span>${queue.length} 筆可用內容</span></div><h1>複習 ${esc(context.label || '這個單元')}</h1><p class="b2-helper">「待複習」是課程整理標記；若另行輸出 Anki 套件，本機排程仍由 Anki 管理。</p>
-    <section class="b2-review-group"><h2>課程待複習</h2>${queue.length ? `<div class="b2-reading-sections">${queue.map((item) => `<section><span>${esc(item.type || item.status || '複習')}</span><p>${esc(item.text || '')}</p>${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</section>`).join('')}</div>` : '<div class="b2-data-note"><strong>這個單元目前沒有已連結的待複習項目。</strong><p>未帶 Unit／Session ID 的舊資料不會再錯放到每一課。</p></div>'}</section></article>`;
+  return `<article class="b2-reading-page b2-review-center"><div class="b2-reading-meta"><span>單元複習</span><span>${queue.length} 筆可用內容</span></div><h1>複習 ${esc(context.label || '這個單元')}</h1><p class="b2-helper">先看問題自己回想，再點開對答案。「待複習」是課程標記，本機 Anki 排程仍由 Anki 管理。</p>
+    <section class="b2-review-group"><h2>課程待複習</h2>${queue.length ? `<div class="b2-review-cards">${queue.map(reviewCardHtml).join('')}</div>` : '<div class="b2-data-note"><strong>這個單元目前沒有已連結的待複習項目。</strong><p>未帶 Unit／Session ID 的舊資料不會再錯放到每一課。</p></div>'}</section></article>`;
 }
 
 function learningView(data) {

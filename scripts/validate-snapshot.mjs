@@ -18,7 +18,7 @@ const questionKeys = new Set(['id', 'examLabel', 'prompt', 'memorization']);
 const memorizationKeys = new Set(['status', 'text']);
 const sessionKeys = new Set(['date', 'title', 'track', 'learningScope', 'completedSummary', 'learningAdjustments', 'reviewSummary', 'learnerPerformance', 'reviewNeeded', 'nextStart', 'sessionId', 'unitId', 'source', 'content', 'vocabulary']);
 const reviewKeys = new Set(['queue']);
-const reviewItemKeys = new Set(['id', 'unitId', 'sessionId', 'type', 'text', 'status', 'lastReview', 'nextReview']);
+const reviewItemKeys = new Set(['id', 'unitId', 'sessionId', 'type', 'concept', 'front', 'back', 'text', 'status', 'lastReview', 'nextReview']);
 const operationsKeys = new Set(['recordHealth']);
 const recordHealthKeys = new Set(['latestSession', 'sessionCount']);
 const latestSessionHealthKeys = new Set(['sessionId', 'date', 'title', 'fields', 'complete']);
@@ -108,6 +108,9 @@ for (const [id, course] of Object.entries(courses)) {
   for (const item of course.review?.queue || []) {
     assertKeys(item, reviewItemKeys, `$.learning.courses.${id}.review.queue[]`);
     assertPublicText(item.text, 4000, `${id}.review.queue.text`);
+    assertPublicText(item.front, 400, `${id}.review.queue.front`);
+    assertPublicText(item.back, 4000, `${id}.review.queue.back`);
+    assertPublicText(item.concept, 120, `${id}.review.queue.concept`);
   }
   if (course.operations !== undefined) {
     assertKeys(course.operations, operationsKeys, `$.learning.courses.${id}.operations`);
