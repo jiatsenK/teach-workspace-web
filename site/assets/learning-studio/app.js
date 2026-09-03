@@ -21,6 +21,14 @@ function visibleSection(courseId, sectionId) {
   return (courseConfigMap[courseId]?.sections || []).some((section) => section.id === sectionId && section.visible);
 }
 
+// 頁面根是 lang="zh-Hant"；語言課的閱讀內容要覆寫成該語言的 BCP-47，
+// 否則瀏覽器會用繁中字型渲染日文漢字／假名（"字體跑掉"）。
+const CONTENT_LANG = { japanese: 'ja', korean: 'ko', english: 'en' };
+function contentLangAttr(subjectId) {
+  const lang = CONTENT_LANG[subjectId];
+  return lang ? ` lang="${lang}"` : '';
+}
+
 function configuredLearning(learning) {
   const hierarchy = learning?.hierarchy || {};
   const sourceCourses = Object.fromEntries((hierarchy.courses || []).map((course) => [course.id, course]));
@@ -262,7 +270,10 @@ function timelineSessionCard(session, queue = [], selected = false) {
   const review = session.reviewNeeded || queue.length ? `<section class="b2-timeline-review"><h3>這次要複習</h3>${session.reviewNeeded ? `<p>${esc(session.reviewNeeded)}</p>` : ''}${queue.length ? `<ul>${queue.map((item) => `<li>${esc(item.text || '')}${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</li>`).join('')}</ul>` : ''}</section>` : '';
   const linkedContent = content.length ? `<details class="b2-timeline-details"><summary>連結的教材 <span>${content.length}</span></summary><div class="b2-content-blocks">${content.map((item) => `<section data-content-id="${esc(item.id || '')}"><span>${esc(item.type || '學習內容')}</span><h3>${esc(item.label || '本次重點')}</h3>${item.explanation ? `<p>${esc(item.explanation)}</p>` : ''}${item.sourceRange ? `<small>來源：${esc(item.sourceRange)}</small>` : ''}</section>`).join('')}</div></details>` : '';
   const linkedVocabulary = vocabulary.length ? `<details class="b2-timeline-details"><summary>連結的單字 <span>${vocabulary.length}</span></summary><div class="b2-vocab">${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>課程標記：${esc(item.memoryStatus || '未開始')}${item.memoryStatus === '待複習' ? '（不等於 Anki 到期）' : ''}</small></div>`).join('')}</div></details>` : '';
-  return `<article id="session-${esc(session.sessionId)}" class="b2-timeline-card ${selected ? 'is-selected' : ''}">${meta}${session.title ? `<h2>${esc(session.title)}</h2>` : ''}${session.learningScope ? `<section><h3>這次學到的範圍</h3><p>${esc(session.learningScope)}</p></section>` : ''}${session.completedSummary ? `<section><h3>完成了什麼</h3><p>${esc(session.completedSummary)}</p></section>` : ''}${session.learnerPerformance ? `<details class="b2-timeline-details"><summary>我的表現</summary><p>${esc(session.learnerPerformance)}</p></details>` : ''}${session.learningAdjustments ? `<details class="b2-timeline-details"><summary>卡住與調整</summary><p>${esc(session.learningAdjustments)}</p></details>` : ''}${review}${linkedContent}${linkedVocabulary}${session.nextStart ? `<section><h3>下次接續</h3><p>${esc(session.nextStart)}</p></section>` : ''}</article>`;
+  // 「我的表現」「卡住與調整」（learnerPerformance / learningAdjustments）刻意不在
+  // 學習者回顧視圖顯示——那是家教教學規劃與學習證據，不是學習者回顧要看的
+  // （2026-09-03 擁有者回饋 B1）。資料仍在 projection 裡，只是前端不渲染。
+  return `<article id="session-${esc(session.sessionId)}" class="b2-timeline-card ${selected ? 'is-selected' : ''}">${meta}${session.title ? `<h2>${esc(session.title)}</h2>` : ''}${session.learningScope ? `<section><h3>這次學到的範圍</h3><p>${esc(session.learningScope)}</p></section>` : ''}${session.completedSummary ? `<section><h3>完成了什麼</h3><p>${esc(session.completedSummary)}</p></section>` : ''}${review}${linkedContent}${linkedVocabulary}${session.nextStart ? `<section><h3>下次接續</h3><p>${esc(session.nextStart)}</p></section>` : ''}</article>`;
 }
 
 function constructionBranches(mode, coursePayload, hierarchyCourse) {
@@ -307,7 +318,7 @@ function timelineView(data, sessions, closed) {
   const content = section === 'outline'
     ? timelineOutline(data)
     : `<article class="b2-reading-page"><div class="b2-reading-meta"><span>時間軸</span><span>${sessions.length} 個學習回合</span></div><h1>${esc(data.selectedCourse?.name || '學習時間軸')}</h1>${unboundReview}<div class="b2-timeline">${sessions.map((session) => timelineSessionCard(session, linkedReview.bySession[session.sessionId] || [], session.sessionId === selectedSessionId)).join('')}</div></article>`;
-  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${timelineRail(data, sessions, selectedSessionId)}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-section="timeline" class="${section === 'timeline' ? 'is-active' : ''}">時間軸</button><button type="button" data-proto-section="outline" class="${section === 'outline' ? 'is-active' : ''}">課程大綱</button><small>按學習日期回顧</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
+  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${timelineRail(data, sessions, selectedSessionId)}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-section="timeline" class="${section === 'timeline' ? 'is-active' : ''}">時間軸</button><button type="button" data-proto-section="outline" class="${section === 'outline' ? 'is-active' : ''}">課程大綱</button><small>按學習日期回顧</small></div><div class="b2-reader__scroll"${contentLangAttr(data.selectedCourse?.subjectId)}>${content}</div></section></main>`;
 }
 
 function unitReader(unit) {
@@ -397,7 +408,7 @@ function learningView(data) {
   const learnTab = useSessions ? '' : `<button type="button" data-proto-section="learn" class="${section === 'learn' ? 'is-active' : ''}">教材</button>`;
   const sessionLabel = useSessions ? '上課紀錄' : `上課紀錄${linkedSessions.length ? ` ${linkedSessions.length}` : ''}`;
   const helper = section === 'review' ? '教材與複習分開閱讀' : '一次只讀一個脈絡';
-  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${rail({ ...data, selectedLessonId, mode, closed })}<section class="b2-reader"><div class="b2-reader-tabs">${learnTab}<button type="button" data-proto-section="session" class="${section === 'session' ? 'is-active' : ''}">${sessionLabel}</button>${reviewTab}<small>${helper}</small></div><div class="b2-reader__scroll">${content}</div></section></main>`;
+  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${rail({ ...data, selectedLessonId, mode, closed })}<section class="b2-reader"><div class="b2-reader-tabs">${learnTab}<button type="button" data-proto-section="session" class="${section === 'session' ? 'is-active' : ''}">${sessionLabel}</button>${reviewTab}<small>${helper}</small></div><div class="b2-reader__scroll"${contentLangAttr(data.selectedCourse?.subjectId)}>${content}</div></section></main>`;
 }
 
 function render() {
