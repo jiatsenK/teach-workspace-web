@@ -9,7 +9,8 @@ const activeModules = new Set([...activeEntrypoints, 'data-provider.js', 'learni
 
 async function importsFor(relativePath) {
   const source = await fs.readFile(path.join(sourceDir, relativePath), 'utf8');
-  return Array.from(source.matchAll(/from\s+['"]([^'"]+)['"]/g), (match) => match[1]);
+  // Built assets carry a ?v=<build> cache-bust query on relative imports; ignore it.
+  return Array.from(source.matchAll(/from\s+['"]([^'"]+)['"]/g), (match) => match[1].split('?')[0]);
 }
 
 for (const file of activeEntrypoints) {
