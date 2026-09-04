@@ -114,6 +114,7 @@ button:active { transform: translateY(1px); }
 .b2-review-card > summary { cursor: pointer; font-weight: 600; }
 .b2-review-card > summary::-webkit-details-marker { color: var(--color-muted); }
 .b2-review-card > p { max-width: 65ch; margin: var(--space-sm) 0 0; }
+.b2-review-card.is-legacy { padding: 0; border: 0; border-radius: 0; background: transparent; }
 .b2-review-card.is-legacy > p { margin: 0; }
 .b2-review-card > small { display: block; margin-top: var(--space-xs); color: var(--color-muted); font-family: var(--font-b-mono); font-size: var(--text-xs); }
 .b2-session-records,.b2-reading-sections { display: grid; margin-top: var(--space-xl); border-top: var(--rule-hair) solid var(--color-rule); }.b2-session-records > section,.b2-reading-sections > section { display: grid; gap: var(--space-sm); padding: var(--space-xl) 0; border-bottom: var(--rule-hair) solid var(--color-rule); }.b2-session-records time,.b2-reading-sections span { color: var(--color-muted); font-family: var(--font-b-mono); font-size: var(--text-xs); }.b2-session-records h2 { margin: 0; font-size: var(--text-lg); }.b2-session-records > section > div { display: grid; grid-template-columns: minmax(8rem, 0.28fr) minmax(0, 1fr); gap: var(--space-md); padding-top: var(--space-sm); border-top: var(--rule-hair) dashed var(--color-rule); }.b2-reading-sections > section h2 { font-size: var(--text-lg); }

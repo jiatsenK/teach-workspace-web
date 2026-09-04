@@ -276,7 +276,9 @@ function timelineSessionCard(session, queue = [], selected = false) {
   const content = Array.isArray(session.content) ? session.content : [];
   const vocabulary = Array.isArray(session.vocabulary) ? session.vocabulary : [];
   const meta = session.date || session.track ? `<div class="b2-reading-meta">${session.date ? `<span>${esc(session.date)}</span>` : ''}${session.track ? `<span>${esc(session.track)}</span>` : ''}</div>` : '';
-  const review = session.reviewNeeded || queue.length ? `<section class="b2-timeline-review"><h3>這次要複習</h3>${session.reviewNeeded ? `<p>${esc(session.reviewNeeded)}</p>` : ''}${queue.length ? `<div class="b2-review-cards">${queue.map(reviewCardHtml).join('')}</div>` : ''}</section>` : '';
+  const hasReviewCards = queue.some((item) => item.front);
+  const showReviewNarrative = session.reviewNeeded && !hasReviewCards;
+  const review = showReviewNarrative || queue.length ? `<section class="b2-timeline-review"><h3>這次要複習</h3>${showReviewNarrative ? `<p>${esc(session.reviewNeeded)}</p>` : ''}${queue.length ? `<div class="b2-review-cards">${queue.map(reviewCardHtml).join('')}</div>` : ''}</section>` : '';
   const linkedContent = content.length ? `<details class="b2-timeline-details"><summary>連結的教材 <span>${content.length}</span></summary><div class="b2-content-blocks">${content.map((item) => `<section data-content-id="${esc(item.id || '')}"><span>${esc(item.type || '學習內容')}</span><h3>${esc(item.label || '本次重點')}</h3>${item.explanation ? `<p>${esc(item.explanation)}</p>` : ''}${item.sourceRange ? `<small>來源：${esc(item.sourceRange)}</small>` : ''}</section>`).join('')}</div></details>` : '';
   const linkedVocabulary = vocabulary.length ? `<details class="b2-timeline-details"><summary>連結的單字 <span>${vocabulary.length}</span></summary><div class="b2-vocab">${vocabulary.map((item) => `<div><b>${esc(item.word)}</b><span>${esc(item.meaning)}</span><small>課程標記：${esc(item.memoryStatus || '未開始')}${item.memoryStatus === '待複習' ? '（不等於 Anki 到期）' : ''}</small></div>`).join('')}</div></details>` : '';
   // 「我的表現」「卡住與調整」（learnerPerformance / learningAdjustments）刻意不在
