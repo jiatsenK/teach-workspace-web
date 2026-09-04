@@ -325,7 +325,7 @@ function timelineView(data, sessions, closed) {
   const selectedSessionId = sessions.some((session) => session.sessionId === requestedSessionId) ? requestedSessionId : sessions[0]?.sessionId || '';
   const reviewQueue = data.selectedCoursePayload?.review?.queue || data.selectedCoursePayload?.reviewQueue || [];
   const linkedReview = linkTimelineItems(reviewQueue, sessions);
-  const unboundReview = linkedReview.unbound.length ? `<details class="b2-timeline-unbound"><summary>未綁定複習項目 <span>${linkedReview.unbound.length}</span></summary><ul>${linkedReview.unbound.map((item) => `<li>${esc(item.text || '')}${item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : ''}</li>`).join('')}</ul></details>` : '';
+  const unboundReview = linkedReview.unbound.length ? `<details class="b2-timeline-unbound"><summary>複習卡片 <span>${linkedReview.unbound.length}</span></summary><div class="b2-review-cards">${linkedReview.unbound.map(reviewCardHtml).join('')}</div></details>` : '';
   const content = section === 'outline'
     ? timelineOutline(data)
     : `<article class="b2-reading-page"><div class="b2-reading-meta"><span>時間軸</span><span>${sessions.length} 個學習回合</span></div><h1>${esc(data.selectedCourse?.name || '學習時間軸')}</h1>${unboundReview}<div class="b2-timeline">${sessions.map((session) => timelineSessionCard(session, linkedReview.bySession[session.sessionId] || [], session.sessionId === selectedSessionId)).join('')}</div></article>`;
