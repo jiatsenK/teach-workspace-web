@@ -1,5 +1,5 @@
-import { createLearningDataProvider } from '../data-provider.js?v=24ee7aa';
-import { groupFootprintsByDate, sessionsForUnit, unitIdForSession } from './course-context.js?v=24ee7aa';
+import { createLearningDataProvider } from '../data-provider.js?v=532b563';
+import { groupFootprintsByDate, sessionsForUnit, unitIdForSession } from './course-context.js?v=532b563';
 
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char]));
 
