@@ -1,4 +1,4 @@
-import { LIVE_DATA_URL } from '../data-provider.js?v=532b563';
+import { LIVE_DATA_URL } from '../data-provider.js?v=80292f1';
 
 export const CONFIG_WRITE_URL = LIVE_DATA_URL.replace(/\?.*$/, '');
 
