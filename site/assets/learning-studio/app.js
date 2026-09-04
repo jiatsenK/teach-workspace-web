@@ -29,13 +29,39 @@ function contentLangAttr(subjectId) {
   return lang ? ` lang="${lang}"` : '';
 }
 
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+const isDateString = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || ''));
+
 // 複習卡：有 front 就先只顯示問題、點開才看答案（提取練習）。
 // 沒有 front 的是舊資料，用單行呈現。
 function reviewCardHtml(item) {
-  const due = item.nextReview ? `<small>${item.front ? '下次複習' : '建議'}：${esc(item.nextReview)}</small>` : '';
-  return item.front
-    ? `<details class="b2-review-card"><summary>${esc(item.front)}</summary>${item.back ? `<p>${esc(item.back)}</p>` : ''}${due}</details>`
-    : `<div class="b2-review-card is-legacy"><p>${esc(item.text || '')}</p>${due}</div>`;
+  if (!item.front) {
+    const hint = item.nextReview ? `<small>建議：${esc(item.nextReview)}</small>` : '';
+    return `<div class="b2-review-card is-legacy"><p>${esc(item.text || '')}</p>${hint}</div>`;
+  }
+  const dated = isDateString(item.nextReview);
+  const due = dated && item.nextReview <= TODAY_ISO;
+  const meta = dated
+    ? `<small>${due ? '今天複習' : `下次複習 ${esc(item.nextReview)}`}</small>`
+    : (item.status ? `<small>${esc(item.status)}</small>` : '');
+  return `<details class="b2-review-card${due ? ' is-due' : ''}"><summary><span>${esc(item.front)}</span></summary><div class="b2-review-card__back"><p>${esc(item.back || '')}</p>${meta}</div></details>`;
+}
+
+function reviewDeckView(data) {
+  // 複習分頁：所有卡片依概念分組
+  const queue = data.selectedCoursePayload?.review?.queue || data.selectedCoursePayload?.reviewQueue || [];
+  if (!queue.length) {
+    return '<article class="b2-reading-page"><div class="b2-reading-meta"><span>複習</span><span>0 張卡</span></div><h1>複習卡片</h1><div class="b2-data-note"><strong>目前沒有複習卡片。</strong><p>上課後整理的概念會變成卡片出現在這裡。</p></div></article>';
+  }
+  const dueCount = queue.filter((item) => isDateString(item.nextReview) && item.nextReview <= TODAY_ISO).length;
+  const groups = new Map();
+  for (const item of queue) {
+    const key = item.concept || item.type || '複習';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  const sections = [...groups.entries()].map(([concept, items]) => `<section class="b2-deck-group"><h2>${esc(concept)}<span>${items.length} 張</span></h2><div class="b2-review-cards">${items.map(reviewCardHtml).join('')}</div></section>`).join('');
+  return `<article class="b2-reading-page b2-deck"><div class="b2-reading-meta"><span>複習</span><span>${queue.length} 張卡${dueCount ? `・今天 ${dueCount}` : ''}</span></div><h1>複習卡片</h1><p class="b2-deck__how">先看問題，自己回想一遍，再點開對答案。</p>${sections}</article>`;
 }
 
 function configuredLearning(learning) {
@@ -320,16 +346,18 @@ function timelineOutline(data) {
 
 function timelineView(data, sessions, closed) {
   const requestedSection = params.get('psection');
-  const section = ['timeline', 'outline'].includes(requestedSection) ? requestedSection : 'timeline';
+  const section = ['timeline', 'outline', 'review'].includes(requestedSection) ? requestedSection : 'timeline';
   const requestedSessionId = params.get('plesson');
   const selectedSessionId = sessions.some((session) => session.sessionId === requestedSessionId) ? requestedSessionId : sessions[0]?.sessionId || '';
   const reviewQueue = data.selectedCoursePayload?.review?.queue || data.selectedCoursePayload?.reviewQueue || [];
   const linkedReview = linkTimelineItems(reviewQueue, sessions);
-  const unboundReview = linkedReview.unbound.length ? `<details class="b2-timeline-unbound"><summary>複習卡片 <span>${linkedReview.unbound.length}</span></summary><div class="b2-review-cards">${linkedReview.unbound.map(reviewCardHtml).join('')}</div></details>` : '';
   const content = section === 'outline'
     ? timelineOutline(data)
-    : `<article class="b2-reading-page"><div class="b2-reading-meta"><span>時間軸</span><span>${sessions.length} 個學習回合</span></div><h1>${esc(data.selectedCourse?.name || '學習時間軸')}</h1>${unboundReview}<div class="b2-timeline">${sessions.map((session) => timelineSessionCard(session, linkedReview.bySession[session.sessionId] || [], session.sessionId === selectedSessionId)).join('')}</div></article>`;
-  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${timelineRail(data, sessions, selectedSessionId)}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-section="timeline" class="${section === 'timeline' ? 'is-active' : ''}">時間軸</button><button type="button" data-proto-section="outline" class="${section === 'outline' ? 'is-active' : ''}">課程大綱</button><small>按學習日期回顧</small></div><div class="b2-reader__scroll"${contentLangAttr(data.selectedCourse?.subjectId)}>${content}</div></section></main>`;
+    : section === 'review'
+      ? reviewDeckView(data)
+      : `<article class="b2-reading-page"><div class="b2-reading-meta"><span>時間軸</span><span>${sessions.length} 個學習回合</span></div><h1>${esc(data.selectedCourse?.name || '學習時間軸')}</h1><div class="b2-timeline">${sessions.map((session) => timelineSessionCard(session, linkedReview.bySession[session.sessionId] || [], session.sessionId === selectedSessionId)).join('')}</div></article>`;
+  const reviewCount = reviewQueue.length;
+  return `<main class="b2-learning-shell ${closed ? 'is-nav-closed' : ''}">${timelineRail(data, sessions, selectedSessionId)}<section class="b2-reader"><div class="b2-reader-tabs"><button type="button" data-proto-section="timeline" class="${section === 'timeline' ? 'is-active' : ''}">時間軸</button><button type="button" data-proto-section="outline" class="${section === 'outline' ? 'is-active' : ''}">課程大綱</button>${reviewCount ? `<button type="button" data-proto-section="review" class="${section === 'review' ? 'is-active' : ''}">複習 ${reviewCount}</button>` : ''}<small>按學習日期回顧</small></div><div class="b2-reader__scroll"${contentLangAttr(data.selectedCourse?.subjectId)}>${content}</div></section></main>`;
 }
 
 function unitReader(unit) {
