@@ -1,5 +1,5 @@
-import { createLearningDataProvider } from './data-provider.js?v=e2e75a8';
-import { publishLearningPlatformConfig, readLearningWriteStatus } from './learning-studio/config-client.js?v=e2e75a8';
+import { createLearningDataProvider } from './data-provider.js?v=310a3c9';
+import { publishLearningPlatformConfig, readLearningWriteStatus } from './learning-studio/config-client.js?v=310a3c9';
 
 const DRAFT_KEY = 'learning-platform.admin-draft.v1';
 const WRITE_KEY = 'learning-platform.admin-key';
